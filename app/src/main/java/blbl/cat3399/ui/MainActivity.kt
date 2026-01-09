@@ -2,6 +2,7 @@ package blbl.cat3399.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -11,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import androidx.recyclerview.widget.SimpleItemAnimator
 import blbl.cat3399.R
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.log.AppLog
@@ -55,6 +57,7 @@ class MainActivity : AppCompatActivity() {
 
         navAdapter = SidebarNavAdapter(
             onClick = { item ->
+                AppLog.d("Nav", "sidebar click id=${item.id} title=${item.title} t=${SystemClock.uptimeMillis()}")
                 when (item.id) {
                     SidebarNavAdapter.ID_HOME -> showRoot(HomeFragment.newInstance())
                     SidebarNavAdapter.ID_CATEGORY -> showRoot(CategoryFragment.newInstance())
@@ -65,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         )
         binding.recyclerSidebar.layoutManager = LinearLayoutManager(this)
         binding.recyclerSidebar.adapter = navAdapter
+        (binding.recyclerSidebar.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
         navAdapter.submit(
             listOf(
                 SidebarNavAdapter.NavItem(SidebarNavAdapter.ID_HOME, getString(R.string.tab_recommend), R.drawable.ic_nav_home),
@@ -155,6 +159,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showRoot(fragment: androidx.fragment.app.Fragment): Boolean {
+        AppLog.d("MainActivity", "showRoot ${fragment.javaClass.simpleName} t=${SystemClock.uptimeMillis()}")
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_container, fragment)
             .commitAllowingStateLoss()

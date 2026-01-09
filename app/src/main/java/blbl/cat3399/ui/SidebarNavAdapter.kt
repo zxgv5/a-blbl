@@ -1,6 +1,7 @@
 package blbl.cat3399.ui
 
 import android.content.res.ColorStateList
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -8,6 +9,7 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import blbl.cat3399.R
+import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.databinding.ItemSidebarNavBinding
 
 class SidebarNavAdapter(
@@ -43,6 +45,10 @@ class SidebarNavAdapter(
         }
         val prevId = selectedId
         selectedId = id
+        AppLog.d(
+            "Nav",
+            "select prev=$prevId new=$id trigger=$trigger t=${SystemClock.uptimeMillis()}",
+        )
 
         val prevPos = items.indexOfFirst { it.id == prevId }
         val newPos = items.indexOfFirst { it.id == id }
@@ -62,6 +68,10 @@ class SidebarNavAdapter(
     override fun onBindViewHolder(holder: Vh, position: Int) {
         val item = items[position]
         val selected = item.id == selectedId
+        AppLog.d(
+            "Nav",
+            "bind pos=$position id=${item.id} selected=$selected labels=$showLabelsAlways t=${SystemClock.uptimeMillis()}",
+        )
         holder.bind(item, selected, showLabelsAlways) {
             val handled = onClick(item)
             if (handled) select(item.id, trigger = false)

@@ -2,6 +2,7 @@ package blbl.cat3399.feature.video
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +22,9 @@ class VideoGridFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var adapter: VideoCardAdapter
+    private var preDrawListener: android.view.ViewTreeObserver.OnPreDrawListener? = null
+    private var firstDrawLogged: Boolean = false
+    private var initialLoadTriggered: Boolean = false
 
     private val source: String by lazy { requireArguments().getString(ARG_SOURCE) ?: SRC_POPULAR }
     private val rid: Int by lazy { requireArguments().getInt(ARG_RID, 0) }
@@ -36,10 +40,12 @@ class VideoGridFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentVideoGridBinding.inflate(inflater, container, false)
+        AppLog.d("VideoGrid", "onCreateView source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        AppLog.d("VideoGrid", "onViewCreated source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
         if (!::adapter.isInitialized) {
             adapter = VideoCardAdapter { card ->
                 AppLog.i("VideoGrid", "click bvid=${card.bvid} cid=${card.cid}")
@@ -71,6 +77,7 @@ class VideoGridFragment : Fragment() {
                     if (total <= 0) return
 
                     if (total - lastVisible - 1 <= 8) {
+                        AppLog.d("VideoGrid", "near end source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
                         loadNextPage()
                     }
                 }
@@ -79,18 +86,44 @@ class VideoGridFragment : Fragment() {
 
         binding.swipeRefresh.setOnRefreshListener { resetAndLoad() }
 
-        if (adapter.itemCount == 0) {
-            binding.swipeRefresh.isRefreshing = true
-            resetAndLoad()
+        if (preDrawListener == null) {
+            preDrawListener =
+                android.view.ViewTreeObserver.OnPreDrawListener {
+                    if (!firstDrawLogged) {
+                        firstDrawLogged = true
+                        AppLog.d(
+                            "VideoGrid",
+                            "first preDraw source=$source rid=$rid t=${SystemClock.uptimeMillis()}",
+                        )
+                    }
+                    true
+                }
+            binding.recycler.viewTreeObserver.addOnPreDrawListener(preDrawListener)
         }
     }
 
     override fun onResume() {
         super.onResume()
+        AppLog.d("VideoGrid", "onResume source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
         (binding.recycler.layoutManager as? StaggeredGridLayoutManager)?.spanCount = spanCountForWidth()
+        maybeTriggerInitialLoad()
+    }
+
+    private fun maybeTriggerInitialLoad() {
+        if (initialLoadTriggered) return
+        if (!this::adapter.isInitialized) return
+        if (adapter.itemCount != 0) {
+            initialLoadTriggered = true
+            return
+        }
+        if (binding.swipeRefresh.isRefreshing) return
+        binding.swipeRefresh.isRefreshing = true
+        resetAndLoad()
+        initialLoadTriggered = true
     }
 
     private fun resetAndLoad() {
+        AppLog.d("VideoGrid", "resetAndLoad source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
         loadedBvids.clear()
         endReached = false
         isLoadingMore = false
@@ -104,6 +137,11 @@ class VideoGridFragment : Fragment() {
         if (isLoadingMore || endReached) return
         val token = requestToken
         isLoadingMore = true
+        val startAt = SystemClock.uptimeMillis()
+        AppLog.d(
+            "VideoGrid",
+            "loadNextPage start source=$source rid=$rid page=$page refresh=$isRefresh t=$startAt",
+        )
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val ps = 24
@@ -136,13 +174,20 @@ class VideoGridFragment : Fragment() {
                     endReached = true
                 }
 
-                AppLog.i("VideoGrid", "load ok source=$source rid=$rid page=${page - 1} add=${filtered.size} total=${adapter.itemCount}")
+                AppLog.i(
+                    "VideoGrid",
+                    "load ok source=$source rid=$rid page=${page - 1} add=${filtered.size} total=${adapter.itemCount} cost=${SystemClock.uptimeMillis() - startAt}ms",
+                )
             } catch (t: Throwable) {
                 AppLog.e("VideoGrid", "load failed source=$source rid=$rid page=$page", t)
                 Toast.makeText(requireContext(), "加载失败，可查看 Logcat(标签 BLBL)", Toast.LENGTH_SHORT).show()
             } finally {
                 if (isRefresh && token == requestToken) binding.swipeRefresh.isRefreshing = false
                 isLoadingMore = false
+                AppLog.d(
+                    "VideoGrid",
+                    "loadNextPage end source=$source rid=$rid page=$page refresh=$isRefresh t=${SystemClock.uptimeMillis()}",
+                )
             }
         }
     }
@@ -160,6 +205,15 @@ class VideoGridFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        AppLog.d("VideoGrid", "onDestroyView source=$source rid=$rid t=${SystemClock.uptimeMillis()}")
+        preDrawListener?.let { listener ->
+            if (binding.recycler.viewTreeObserver.isAlive) {
+                binding.recycler.viewTreeObserver.removeOnPreDrawListener(listener)
+            }
+        }
+        preDrawListener = null
+        firstDrawLogged = false
+        initialLoadTriggered = false
         _binding = null
         super.onDestroyView()
     }

@@ -7,6 +7,8 @@ import blbl.cat3399.core.model.VideoCard
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.proto.dm.DmSegMobileReply
 import blbl.cat3399.proto.dmview.DmWebViewReply
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -75,7 +77,7 @@ object BiliApi {
         val json = BiliClient.getJson(url)
         val items = json.optJSONObject("data")?.optJSONArray("item") ?: JSONArray()
         AppLog.d(TAG, "recommend items=${items.length()}")
-        return parseVideoCards(items)
+        return withContext(Dispatchers.Default) { parseVideoCards(items) }
     }
 
     suspend fun popular(pn: Int = 1, ps: Int = 20): List<VideoCard> {
@@ -86,7 +88,7 @@ object BiliApi {
         val json = BiliClient.getJson(url)
         val list = json.optJSONObject("data")?.optJSONArray("list") ?: JSONArray()
         AppLog.d(TAG, "popular list=${list.length()}")
-        return parseVideoCards(list)
+        return withContext(Dispatchers.Default) { parseVideoCards(list) }
     }
 
     suspend fun regionLatest(rid: Int, pn: Int = 1, ps: Int = 20): List<VideoCard> {
@@ -97,7 +99,7 @@ object BiliApi {
         val json = BiliClient.getJson(url)
         val archives = json.optJSONObject("data")?.optJSONArray("archives") ?: JSONArray()
         AppLog.d(TAG, "region rid=$rid archives=${archives.length()}")
-        return parseVideoCards(archives)
+        return withContext(Dispatchers.Default) { parseVideoCards(archives) }
     }
 
     suspend fun view(bvid: String): JSONObject {
@@ -282,19 +284,21 @@ object BiliApi {
             ),
         )
         val list = json.optJSONObject("data")?.optJSONArray("list") ?: JSONArray()
-        val out = ArrayList<Following>(list.length())
-        for (i in 0 until list.length()) {
-            val obj = list.optJSONObject(i) ?: continue
-            out.add(
-                Following(
-                    mid = obj.optLong("mid"),
-                    name = obj.optString("uname", ""),
-                    avatarUrl = obj.optString("face").takeIf { it.isNotBlank() },
-                ),
-            )
+        return withContext(Dispatchers.Default) {
+            val out = ArrayList<Following>(list.length())
+            for (i in 0 until list.length()) {
+                val obj = list.optJSONObject(i) ?: continue
+                out.add(
+                    Following(
+                        mid = obj.optLong("mid"),
+                        name = obj.optString("uname", ""),
+                        avatarUrl = obj.optString("face").takeIf { it.isNotBlank() },
+                    ),
+                )
+            }
+            AppLog.d(TAG, "followings vmid=$vmid size=${out.size}")
+            out
         }
-        AppLog.d(TAG, "followings vmid=$vmid size=${out.size}")
-        return out
     }
 
     data class DynamicPage(
@@ -313,37 +317,39 @@ object BiliApi {
         val json = BiliClient.getJson(url)
         val data = json.optJSONObject("data") ?: JSONObject()
         val items = data.optJSONArray("items") ?: JSONArray()
-        val cards = ArrayList<VideoCard>()
-        for (i in 0 until items.length()) {
-            val it = items.optJSONObject(i) ?: continue
-            val modules = it.optJSONObject("modules") ?: continue
-            val moduleDynamic = modules.optJSONObject("module_dynamic") ?: continue
-            val major = moduleDynamic.optJSONObject("major") ?: continue
-            val archive = major.optJSONObject("archive") ?: continue
-            val bvid = archive.optString("bvid", "")
-            if (bvid.isBlank()) continue
+        return withContext(Dispatchers.Default) {
+            val cards = ArrayList<VideoCard>()
+            for (i in 0 until items.length()) {
+                val it = items.optJSONObject(i) ?: continue
+                val modules = it.optJSONObject("modules") ?: continue
+                val moduleDynamic = modules.optJSONObject("module_dynamic") ?: continue
+                val major = moduleDynamic.optJSONObject("major") ?: continue
+                val archive = major.optJSONObject("archive") ?: continue
+                val bvid = archive.optString("bvid", "")
+                if (bvid.isBlank()) continue
 
-            val ownerName = modules.optJSONObject("module_author")?.optString("name", "") ?: ""
-            val ownerFace = modules.optJSONObject("module_author")?.optString("face")?.takeIf { it.isNotBlank() }
-            val stat = archive.optJSONObject("stat") ?: JSONObject()
-            cards.add(
-                VideoCard(
-                    bvid = bvid,
-                    cid = null,
-                    title = archive.optString("title", ""),
-                    coverUrl = archive.optString("cover", ""),
-                    durationSec = parseDuration(archive.optString("duration_text", "0:00")),
-                    ownerName = ownerName,
-                    ownerFace = ownerFace,
-                    view = stat.optString("play").toLongOrNull(),
-                    danmaku = stat.optString("danmaku").toLongOrNull(),
-                    pubDateText = null,
-                ),
-            )
+                val ownerName = modules.optJSONObject("module_author")?.optString("name", "") ?: ""
+                val ownerFace = modules.optJSONObject("module_author")?.optString("face")?.takeIf { it.isNotBlank() }
+                val stat = archive.optJSONObject("stat") ?: JSONObject()
+                cards.add(
+                    VideoCard(
+                        bvid = bvid,
+                        cid = null,
+                        title = archive.optString("title", ""),
+                        coverUrl = archive.optString("cover", ""),
+                        durationSec = parseDuration(archive.optString("duration_text", "0:00")),
+                        ownerName = ownerName,
+                        ownerFace = ownerFace,
+                        view = stat.optString("play").toLongOrNull(),
+                        danmaku = stat.optString("danmaku").toLongOrNull(),
+                        pubDateText = null,
+                    ),
+                )
+            }
+            val next = data.optString("offset", "").takeIf { it.isNotBlank() }
+            AppLog.d(TAG, "dynamicAllVideo size=${cards.size} nextOffset=${next?.take(8)}")
+            DynamicPage(cards, next)
         }
-        val next = data.optString("offset", "").takeIf { it.isNotBlank() }
-        AppLog.d(TAG, "dynamicAllVideo size=${cards.size} nextOffset=${next?.take(8)}")
-        return DynamicPage(cards, next)
     }
 
     suspend fun dynamicSpaceVideo(hostMid: Long, offset: String? = null): DynamicPage {
@@ -357,37 +363,39 @@ object BiliApi {
         val json = BiliClient.getJson(url)
         val data = json.optJSONObject("data") ?: JSONObject()
         val items = data.optJSONArray("items") ?: JSONArray()
-        val cards = ArrayList<VideoCard>()
-        for (i in 0 until items.length()) {
-            val it = items.optJSONObject(i) ?: continue
-            val modules = it.optJSONObject("modules") ?: continue
-            val moduleDynamic = modules.optJSONObject("module_dynamic") ?: continue
-            val major = moduleDynamic.optJSONObject("major") ?: continue
-            val archive = major.optJSONObject("archive") ?: continue
-            val bvid = archive.optString("bvid", "")
-            if (bvid.isBlank()) continue
+        return withContext(Dispatchers.Default) {
+            val cards = ArrayList<VideoCard>()
+            for (i in 0 until items.length()) {
+                val it = items.optJSONObject(i) ?: continue
+                val modules = it.optJSONObject("modules") ?: continue
+                val moduleDynamic = modules.optJSONObject("module_dynamic") ?: continue
+                val major = moduleDynamic.optJSONObject("major") ?: continue
+                val archive = major.optJSONObject("archive") ?: continue
+                val bvid = archive.optString("bvid", "")
+                if (bvid.isBlank()) continue
 
-            val ownerName = modules.optJSONObject("module_author")?.optString("name", "") ?: ""
-            val ownerFace = modules.optJSONObject("module_author")?.optString("face")?.takeIf { it.isNotBlank() }
-            val stat = archive.optJSONObject("stat") ?: JSONObject()
-            cards.add(
-                VideoCard(
-                    bvid = bvid,
-                    cid = null,
-                    title = archive.optString("title", ""),
-                    coverUrl = archive.optString("cover", ""),
-                    durationSec = parseDuration(archive.optString("duration_text", "0:00")),
-                    ownerName = ownerName,
-                    ownerFace = ownerFace,
-                    view = stat.optString("play").toLongOrNull(),
-                    danmaku = stat.optString("danmaku").toLongOrNull(),
-                    pubDateText = null,
-                ),
-            )
+                val ownerName = modules.optJSONObject("module_author")?.optString("name", "") ?: ""
+                val ownerFace = modules.optJSONObject("module_author")?.optString("face")?.takeIf { it.isNotBlank() }
+                val stat = archive.optJSONObject("stat") ?: JSONObject()
+                cards.add(
+                    VideoCard(
+                        bvid = bvid,
+                        cid = null,
+                        title = archive.optString("title", ""),
+                        coverUrl = archive.optString("cover", ""),
+                        durationSec = parseDuration(archive.optString("duration_text", "0:00")),
+                        ownerName = ownerName,
+                        ownerFace = ownerFace,
+                        view = stat.optString("play").toLongOrNull(),
+                        danmaku = stat.optString("danmaku").toLongOrNull(),
+                        pubDateText = null,
+                    ),
+                )
+            }
+            val next = data.optString("offset", "").takeIf { it.isNotBlank() }
+            AppLog.d(TAG, "dynamicSpaceVideo hostMid=$hostMid size=${cards.size} nextOffset=${next?.take(8)}")
+            DynamicPage(cards, next)
         }
-        val next = data.optString("offset", "").takeIf { it.isNotBlank() }
-        AppLog.d(TAG, "dynamicSpaceVideo hostMid=$hostMid size=${cards.size} nextOffset=${next?.take(8)}")
-        return DynamicPage(cards, next)
     }
 
     private fun genPlayUrlSession(nowMs: Long = System.currentTimeMillis()): String? {

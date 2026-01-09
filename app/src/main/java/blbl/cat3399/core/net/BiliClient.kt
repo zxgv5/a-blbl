@@ -3,6 +3,8 @@ package blbl.cat3399.core.net
 import android.content.Context
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.prefs.AppPrefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.CookieJar
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -96,9 +98,9 @@ object BiliClient {
         for ((k, v) in headers) reqBuilder.header(k, v)
         val res = clientFor(url, noCookies = noCookies).newCall(reqBuilder.build()).await()
         res.use { r ->
-            val body = r.body?.string() ?: ""
+            val body = withContext(Dispatchers.IO) { r.body?.string() ?: "" }
             if (!r.isSuccessful) throw IOException("HTTP ${r.code} ${r.message} body=${body.take(200)}")
-            return JSONObject(body)
+            return withContext(Dispatchers.Default) { JSONObject(body) }
         }
     }
 
@@ -108,7 +110,7 @@ object BiliClient {
         val res = clientFor(url, noCookies = noCookies).newCall(reqBuilder.build()).await()
         res.use { r ->
             if (!r.isSuccessful) throw IOException("HTTP ${r.code} ${r.message}")
-            return r.body?.bytes() ?: ByteArray(0)
+            return withContext(Dispatchers.IO) { r.body?.bytes() ?: ByteArray(0) }
         }
     }
 
