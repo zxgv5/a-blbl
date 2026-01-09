@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Blbl" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/blbl_surface</item>
+        <item name="colorPrimaryVariant">@color/blbl_surface</item>
+        <item name="colorOnPrimary">@color/blbl_text</item>
+        <item name="colorSecondary">@color/blbl_purple</item>
+        <item name="colorOnSecondary">@color/blbl_text</item>
+        <item name="android:statusBarColor">@color/blbl_bg</item>
+        <item name="android:navigationBarColor">@color/blbl_bg</item>
+        <item name="android:windowBackground">@color/blbl_bg</item>
+        <item name="android:textColorPrimary">@color/blbl_text</item>
+        <item name="android:textColorSecondary">@color/blbl_text_secondary</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">true</item>
+    </style>
+</resources>
+

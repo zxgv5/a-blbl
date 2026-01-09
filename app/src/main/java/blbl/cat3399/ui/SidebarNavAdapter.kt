@@ -1,0 +1,82 @@
+package blbl.cat3399.ui
+
+import android.content.res.ColorStateList
+import android.util.TypedValue
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.RecyclerView
+import blbl.cat3399.R
+import blbl.cat3399.databinding.ItemSidebarNavBinding
+
+class SidebarNavAdapter(
+    private val onClick: (NavItem) -> Boolean,
+) : RecyclerView.Adapter<SidebarNavAdapter.Vh>() {
+    data class NavItem(
+        val id: Int,
+        val title: String,
+        val iconRes: Int,
+    )
+
+    private val items = ArrayList<NavItem>()
+    private var selectedId: Int = ID_HOME
+
+    fun submit(list: List<NavItem>, selectedId: Int) {
+        items.clear()
+        items.addAll(list)
+        this.selectedId = selectedId
+        notifyDataSetChanged()
+    }
+
+    fun select(id: Int, trigger: Boolean) {
+        selectedId = id
+        notifyDataSetChanged()
+        if (trigger) items.firstOrNull { it.id == id }?.let { onClick(it) }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Vh {
+        val binding = ItemSidebarNavBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return Vh(binding)
+    }
+
+    override fun onBindViewHolder(holder: Vh, position: Int) {
+        val item = items[position]
+        val selected = item.id == selectedId
+        holder.bind(item, selected) {
+            val handled = onClick(item)
+            if (handled) select(item.id, trigger = false)
+        }
+    }
+
+    override fun getItemCount(): Int = items.size
+
+    class Vh(private val binding: ItemSidebarNavBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(item: NavItem, selected: Boolean, onClick: () -> Unit) {
+            binding.ivIcon.setImageResource(item.iconRes)
+            binding.tvLabel.text = item.title
+            binding.tvLabel.visibility = if (selected) View.VISIBLE else View.GONE
+            binding.card.setCardBackgroundColor(
+                if (selected) ContextCompat.getColor(binding.root.context, R.color.blbl_surface) else 0x00000000,
+            )
+            val iconTint = if (selected) R.color.blbl_purple else R.color.blbl_text_secondary
+            binding.ivIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, iconTint))
+
+            val heightDp = if (selected) 56f else 32f
+            val lp = binding.card.layoutParams
+            lp.height = dp(binding.root, heightDp)
+            binding.card.layoutParams = lp
+            binding.root.setOnClickListener { onClick() }
+        }
+
+        private fun dp(view: View, v: Float): Int =
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, view.resources.displayMetrics).toInt()
+    }
+
+    companion object {
+        const val ID_HOME = 1
+        const val ID_CATEGORY = 2
+        const val ID_DYNAMIC = 3
+        const val ID_SETTINGS = 4
+    }
+}

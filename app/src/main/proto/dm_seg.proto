@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package blbl.cat3399.dm;
+
+option java_multiple_files = true;
+option java_package = "blbl.cat3399.proto.dm";
+
+message DmSegMobileReply {
+  repeated DanmakuElem elems = 1;
+  int32 state = 2;
+}
+
+message DanmakuElem {
+  int32 progress = 2;
+  int32 mode = 3;
+  int32 fontsize = 4;
+  uint32 color = 5;
+  string content = 7;
+  int32 weight = 9;
+}
+
