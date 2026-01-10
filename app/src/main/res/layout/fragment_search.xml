@@ -125,35 +125,9 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/btn_full_keyboard"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="10dp"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:stateListAnimator="@animator/blbl_focus_scale"
-                    app:cardBackgroundColor="@color/blbl_surface"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="@color/blbl_focus_stroke"
-                    app:strokeWidth="2dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:text="@string/search_full_keyboard"
-                        android:textColor="@color/blbl_purple"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
                     android:id="@+id/btn_search"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
                     android:stateListAnimator="@animator/blbl_focus_scale"
@@ -174,15 +148,47 @@
             </LinearLayout>
         </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_suggest"
+        <LinearLayout
+            android:id="@+id/panel_history"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginEnd="12dp"
             android:layout_weight="0.8"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:paddingTop="4dp" />
+            android:orientation="vertical">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_suggest"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:paddingTop="4dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_clear_history"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:stateListAnimator="@animator/blbl_focus_scale"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/blbl_surface"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/blbl_focus_stroke"
+                app:strokeWidth="2dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="@string/search_clear_history"
+                    android:textColor="@color/blbl_text_secondary"
+                    android:textSize="14sp" />
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_hot"

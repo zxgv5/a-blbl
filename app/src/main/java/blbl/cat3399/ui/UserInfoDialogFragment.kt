@@ -7,10 +7,14 @@ import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import blbl.cat3399.R
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.image.ImageLoader
 import blbl.cat3399.core.log.AppLog
+import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.databinding.DialogUserInfoBinding
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -52,7 +56,9 @@ class UserInfoDialogFragment : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        val window = dialog?.window ?: return
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        applyImmersive(window, BiliClient.prefs.fullscreenEnabled)
     }
 
     override fun onDestroyView() {
@@ -134,6 +140,17 @@ class UserInfoDialogFragment : DialogFragment() {
             is Number -> any.toInt()
             is String -> any.toIntOrNull()
             else -> null
+        }
+    }
+
+    private fun applyImmersive(window: android.view.Window, enabled: Boolean) {
+        WindowCompat.setDecorFitsSystemWindows(window, !enabled)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (enabled) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 

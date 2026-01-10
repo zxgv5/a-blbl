@@ -99,6 +99,27 @@ class SearchFragment : Fragment() {
         binding.recyclerSuggest.adapter = suggestAdapter
         binding.recyclerSuggest.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(requireContext())
         (binding.recyclerSuggest.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
+        binding.recyclerSuggest.addOnChildAttachStateChangeListener(
+            object : RecyclerView.OnChildAttachStateChangeListener {
+                override fun onChildViewAttachedToWindow(view: View) {
+                    view.setOnKeyListener { v, keyCode, event ->
+                        if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                        if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return@setOnKeyListener false
+                        if (binding.btnClearHistory.visibility != View.VISIBLE) return@setOnKeyListener false
+                        val holder = binding.recyclerSuggest.findContainingViewHolder(v) ?: return@setOnKeyListener false
+                        val pos = holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION } ?: return@setOnKeyListener false
+                        val last = (binding.recyclerSuggest.adapter?.itemCount ?: 0) - 1
+                        if (pos != last) return@setOnKeyListener false
+                        binding.btnClearHistory.requestFocus()
+                        true
+                    }
+                }
+
+                override fun onChildViewDetachedFromWindow(view: View) {
+                    view.setOnKeyListener(null)
+                }
+            },
+        )
 
         binding.recyclerHot.adapter = hotAdapter
         binding.recyclerHot.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(requireContext())
@@ -111,10 +132,22 @@ class SearchFragment : Fragment() {
             if (query.isNotEmpty()) setQuery(query.dropLast(1))
         }
         binding.btnSearch.setOnClickListener { performSearch() }
-        binding.btnFullKeyboard.setOnClickListener { Toast.makeText(requireContext(), "已是全键盘", Toast.LENGTH_SHORT).show() }
+        binding.btnClearHistory.setOnClickListener {
+            BiliClient.prefs.clearSearchHistory()
+            reloadHistory()
+            updateMiddleUi(historyMatches(query), extra = emptyList())
+            updateClearHistoryButton(query)
+            focusFirstKey()
+        }
+        binding.btnClearHistory.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            if (keyCode != KeyEvent.KEYCODE_DPAD_UP) return@setOnKeyListener false
+            if (focusLastHistoryItem()) true else false
+        }
 
         updateQueryUi()
         updateMiddleUi(historyMatches(query), extra = emptyList())
+        updateClearHistoryButton(query)
     }
 
     private fun setupResults() {
@@ -278,9 +311,11 @@ class SearchFragment : Fragment() {
         suggestJob?.cancel()
         if (term.isBlank()) {
             updateMiddleUi(historyMatches(term), extra = emptyList())
+            updateClearHistoryButton(term)
             return
         }
         updateMiddleUi(historyMatches(term), extra = emptyList())
+        updateClearHistoryButton(term)
         suggestJob =
             viewLifecycleOwner.lifecycleScope.launch {
                 delay(200)
@@ -308,6 +343,11 @@ class SearchFragment : Fragment() {
         val list = merged.values.toList()
         binding.recyclerSuggest.visibility = if (list.isNotEmpty()) View.VISIBLE else View.INVISIBLE
         suggestAdapter.submit(list)
+    }
+
+    private fun updateClearHistoryButton(term: String) {
+        val show = term.isBlank() && history.isNotEmpty()
+        binding.btnClearHistory.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun performSearch() {
@@ -363,6 +403,17 @@ class SearchFragment : Fragment() {
         val pos = binding.tabLayout.selectedTabPosition.takeIf { it >= 0 } ?: 0
         val tabView = tabStrip.getChildAt(pos) ?: return false
         tabView.requestFocus()
+        return true
+    }
+
+    private fun focusLastHistoryItem(): Boolean {
+        val count = binding.recyclerSuggest.adapter?.itemCount ?: return false
+        if (count <= 0) return false
+        val last = count - 1
+        binding.recyclerSuggest.scrollToPosition(last)
+        binding.recyclerSuggest.post {
+            binding.recyclerSuggest.findViewHolderForAdapterPosition(last)?.itemView?.requestFocus()
+        }
         return true
     }
 

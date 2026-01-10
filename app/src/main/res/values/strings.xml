@@ -13,6 +13,7 @@
     <string name="search_t9">T9键盘</string>
     <string name="search_full_keyboard">全键盘</string>
     <string name="search_action">搜索</string>
+    <string name="search_clear_history">清空搜索记录</string>
     <string name="search_tab_video">视频</string>
     <string name="search_tab_media">影视</string>
     <string name="search_tab_live">直播</string>
