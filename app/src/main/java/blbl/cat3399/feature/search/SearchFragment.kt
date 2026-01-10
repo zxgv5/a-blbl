@@ -360,7 +360,7 @@ class SearchFragment : Fragment() {
         reloadHistory()
         showResults()
         resetAndLoad()
-        binding.btnSort.requestFocus()
+        focusSelectedTabAfterShow()
     }
 
     private fun showInput() {
@@ -417,6 +417,14 @@ class SearchFragment : Fragment() {
             binding.recyclerSuggest.findViewHolderForAdapterPosition(last)?.itemView?.requestFocus()
         }
         return true
+    }
+
+    private fun focusSelectedTabAfterShow() {
+        binding.tabLayout.post {
+            if (binding.panelResults.visibility == View.VISIBLE) {
+                focusSelectedTab()
+            }
+        }
     }
 
     private fun switchTab(pos: Int) {
