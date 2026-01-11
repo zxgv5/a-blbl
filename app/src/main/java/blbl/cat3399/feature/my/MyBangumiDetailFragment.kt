@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import android.content.Intent
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -12,8 +13,10 @@ import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.image.ImageLoader
 import blbl.cat3399.core.image.ImageUrl
 import blbl.cat3399.core.log.AppLog
+import blbl.cat3399.core.model.BangumiEpisode
 import blbl.cat3399.core.util.Format
 import blbl.cat3399.databinding.FragmentMyBangumiDetailBinding
+import blbl.cat3399.feature.player.PlayerActivity
 import kotlinx.coroutines.launch
 
 class MyBangumiDetailFragment : Fragment() {
@@ -24,6 +27,7 @@ class MyBangumiDetailFragment : Fragment() {
     private val isDrama: Boolean by lazy { requireArguments().getBoolean(ARG_IS_DRAMA) }
 
     private lateinit var epAdapter: BangumiEpisodeAdapter
+    private var currentEpisodes: List<BangumiEpisode> = emptyList()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMyBangumiDetailBinding.inflate(inflater, container, false)
@@ -36,13 +40,18 @@ class MyBangumiDetailFragment : Fragment() {
 
         epAdapter =
             BangumiEpisodeAdapter {
-                Toast.makeText(requireContext(), "暂不支持追番/追剧播放", Toast.LENGTH_SHORT).show()
+                playEpisode(it)
             }
         binding.recyclerEpisodes.adapter = epAdapter
         binding.recyclerEpisodes.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
 
         binding.btnPrimary.setOnClickListener {
-            Toast.makeText(requireContext(), "暂不支持追番/追剧播放", Toast.LENGTH_SHORT).show()
+            val first = currentEpisodes.firstOrNull()
+            if (first == null) {
+                Toast.makeText(requireContext(), "暂无可播放剧集", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            playEpisode(first)
         }
         binding.btnSecondary.setOnClickListener {
             Toast.makeText(requireContext(), "暂不支持操作", Toast.LENGTH_SHORT).show()
@@ -69,12 +78,27 @@ class MyBangumiDetailFragment : Fragment() {
                 }
                 binding.tvMeta.text = metaParts.joinToString(" | ")
                 ImageLoader.loadInto(binding.ivCover, ImageUrl.cover(detail.coverUrl))
+                currentEpisodes = detail.episodes
                 epAdapter.submit(detail.episodes)
             } catch (t: Throwable) {
                 AppLog.e("MyBangumiDetail", "load failed seasonId=$seasonId", t)
                 Toast.makeText(requireContext(), "加载失败，可查看 Logcat(标签 BLBL)", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun playEpisode(ep: BangumiEpisode) {
+        val bvid = ep.bvid.orEmpty()
+        val cid = ep.cid ?: -1L
+        if (bvid.isBlank() || cid <= 0) {
+            Toast.makeText(requireContext(), "缺少播放信息（bvid/cid）", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(requireContext(), PlayerActivity::class.java)
+                .putExtra(PlayerActivity.EXTRA_BVID, bvid)
+                .putExtra(PlayerActivity.EXTRA_CID, cid),
+        )
     }
 
     override fun onDestroyView() {

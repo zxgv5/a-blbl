@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
 import blbl.cat3399.core.api.BiliApi
@@ -46,7 +46,8 @@ class MyBangumiFollowFragment : Fragment(), MyTabSwitchFocusTarget {
             }
         }
         binding.recycler.adapter = adapter
-        binding.recycler.layoutManager = LinearLayoutManager(requireContext())
+        binding.recycler.setHasFixedSize(true)
+        binding.recycler.layoutManager = GridLayoutManager(requireContext(), spanCountForWidth(resources))
         (binding.recycler.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
         binding.recycler.clearOnScrollListeners()
         binding.recycler.addOnChildAttachStateChangeListener(
@@ -57,11 +58,10 @@ class MyBangumiFollowFragment : Fragment(), MyTabSwitchFocusTarget {
                         when (keyCode) {
                             KeyEvent.KEYCODE_DPAD_UP -> {
                                 if (!binding.recycler.canScrollVertically(-1)) {
-                                    val lm = binding.recycler.layoutManager as? LinearLayoutManager ?: return@setOnKeyListener false
+                                    val lm = binding.recycler.layoutManager as? GridLayoutManager ?: return@setOnKeyListener false
                                     val holder = binding.recycler.findContainingViewHolder(v) ?: return@setOnKeyListener false
                                     val pos = holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION } ?: return@setOnKeyListener false
-                                    val first = lm.findFirstVisibleItemPosition()
-                                    if (first == pos) {
+                                    if (pos < lm.spanCount) {
                                         focusSelectedMyTabIfAvailable()
                                         return@setOnKeyListener true
                                     }
@@ -114,11 +114,11 @@ class MyBangumiFollowFragment : Fragment(), MyTabSwitchFocusTarget {
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                     if (dy <= 0) return
                     if (isLoadingMore || endReached) return
-                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                    val lm = recyclerView.layoutManager as? GridLayoutManager ?: return
                     val last = lm.findLastVisibleItemPosition()
                     val total = adapter.itemCount
                     if (total <= 0) return
-                    if (total - last - 1 <= 6) loadNextPage()
+                    if (total - last - 1 <= 8) loadNextPage()
                 }
             },
         )
@@ -127,6 +127,7 @@ class MyBangumiFollowFragment : Fragment(), MyTabSwitchFocusTarget {
 
     override fun onResume() {
         super.onResume()
+        (binding.recycler.layoutManager as? GridLayoutManager)?.spanCount = spanCountForWidth(resources)
         maybeTriggerInitialLoad()
         restoreFocusIfNeeded()
         maybeConsumePendingFocusFirstItemFromTabSwitch()

@@ -45,14 +45,20 @@ class BangumiFollowAdapter(
         fun bind(item: BangumiSeason, onClick: (position: Int, season: BangumiSeason) -> Unit) {
             binding.tvTitle.text = item.title
 
-            val subtitle =
-                when {
-                    item.lastEpIndex != null -> "看到第${item.lastEpIndex}话"
-                    item.newestEpIndex != null -> "更新至${item.newestEpIndex}话"
-                    item.totalCount != null -> "共${item.totalCount}话"
-                    else -> ""
+            val metaParts =
+                buildList {
+                    item.seasonTypeName?.let { add(it) }
+                    val progress =
+                        item.progressText?.takeIf { it.isNotBlank() }
+                            ?: item.lastEpIndex?.let { "看到第${it}话" }
+                    progress?.let { add(it) }
+                    when {
+                        item.isFinish == true -> add("已完结")
+                        item.newestEpIndex != null -> add("更新至${item.newestEpIndex}话")
+                        item.totalCount != null -> add("共${item.totalCount}话")
+                    }
                 }
-            binding.tvSubtitle.text = subtitle
+            binding.tvSubtitle.text = metaParts.joinToString(" | ")
             ImageLoader.loadInto(binding.ivCover, ImageUrl.cover(item.coverUrl))
 
             binding.root.setOnClickListener {
