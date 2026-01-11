@@ -8,6 +8,14 @@ android {
     namespace = "blbl.cat3399"
     compileSdk = 36
 
+    fun propOrEnv(name: String): String? {
+        val fromProp = project.findProperty(name) as String?
+        if (!fromProp.isNullOrBlank()) return fromProp
+        val fromEnv = System.getenv(name)
+        if (!fromEnv.isNullOrBlank()) return fromEnv
+        return null
+    }
+
     defaultConfig {
         applicationId = "blbl.cat3399"
         minSdk = 21
@@ -23,9 +31,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = rootProject.file("keystore/release.keystore")
-            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
-            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
-            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+            storePassword = propOrEnv("RELEASE_STORE_PASSWORD")
+            keyAlias = propOrEnv("RELEASE_KEY_ALIAS")
+            keyPassword = propOrEnv("RELEASE_KEY_PASSWORD")
         }
     }
 
