@@ -1,20 +1,30 @@
 package blbl.cat3399.feature.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.text.InputType
 import android.view.KeyEvent
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
+import blbl.cat3399.core.update.TestApkUpdater
 import blbl.cat3399.databinding.ActivitySettingsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.progressindicator.LinearProgressIndicator
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class SettingsActivity : AppCompatActivity() {
@@ -22,6 +32,7 @@ class SettingsActivity : AppCompatActivity() {
     private var currentSectionIndex: Int = -1
     private lateinit var leftAdapter: SettingsLeftAdapter
     private lateinit var rightAdapter: SettingsEntryAdapter
+    private var testUpdateJob: Job? = null
 
     private val sections = listOf(
         "通用设置",
@@ -167,6 +178,7 @@ class SettingsActivity : AppCompatActivity() {
             "关于应用" -> listOf(
                 SettingEntry("版本", "0.1.0", null),
                 SettingEntry("日志标签", "BLBL", "用于 Logcat 过滤"),
+                SettingEntry("更新测试版本", "点击更新", "从内置直链下载 APK 并安装（限速）"),
             )
 
             else -> listOf(
@@ -464,8 +476,117 @@ class SettingsActivity : AppCompatActivity() {
                 refreshSection(entry.title)
             }
 
+            "更新测试版本" -> showTestUpdateDialog()
+
             else -> AppLog.i("Settings", "click ${entry.title}")
         }
+    }
+
+    private fun showTestUpdateDialog() {
+        if (testUpdateJob?.isActive == true) {
+            Toast.makeText(this, "正在下载更新…", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("需要授权安装")
+                .setMessage("更新需要允许“安装未知应用”。现在去设置开启吗？")
+                .setPositiveButton("去设置") { _, _ ->
+                    runCatching {
+                        val intent =
+                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).setData(Uri.parse("package:$packageName"))
+                        startActivity(intent)
+                    }.onFailure {
+                        Toast.makeText(this, "无法打开系统设置", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+            return
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("更新测试版本")
+            .setMessage(
+                buildString {
+                    append("将从内置直链下载 APK 并调用系统安装器覆盖安装。\n\n")
+                    append("注意：需要允许“安装未知应用”。")
+                },
+            )
+            .setPositiveButton("开始下载") { _, _ -> startTestUpdateDownload() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun startTestUpdateDownload() {
+        val now = System.currentTimeMillis()
+        val cooldownLeftMs = TestApkUpdater.cooldownLeftMs(now)
+        if (cooldownLeftMs > 0) {
+            Toast.makeText(this, "操作太频繁，请稍后再试（${(cooldownLeftMs / 1000).coerceAtLeast(1)}s）", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val view = layoutInflater.inflate(blbl.cat3399.R.layout.dialog_test_update_progress, null, false)
+        val tvStatus = view.findViewById<TextView>(blbl.cat3399.R.id.tv_status)
+        val progress = view.findViewById<LinearProgressIndicator>(blbl.cat3399.R.id.progress)
+        progress.isIndeterminate = true
+        progress.max = 100
+        tvStatus.text = "准备下载…"
+
+        val dialog =
+            MaterialAlertDialogBuilder(this)
+                .setTitle("下载更新")
+                .setView(view)
+                .setNegativeButton("取消") { _, _ -> testUpdateJob?.cancel() }
+                .setCancelable(false)
+                .show()
+
+        TestApkUpdater.markStarted(now)
+        testUpdateJob =
+            lifecycleScope.launch {
+                try {
+                    val apkFile =
+                        TestApkUpdater.downloadApkToCache(
+                            context = this@SettingsActivity,
+                            url = TestApkUpdater.TEST_APK_URL,
+                        ) { state ->
+                            runOnUiThread {
+                                when (state) {
+                                    is TestApkUpdater.Progress.Connecting -> {
+                                        tvStatus.text = "连接中…"
+                                        progress.isIndeterminate = true
+                                    }
+
+                                    is TestApkUpdater.Progress.Downloading -> {
+                                        val percent = state.percent
+                                        progress.isIndeterminate = percent == null
+                                        if (percent != null) progress.progress = percent
+                                        tvStatus.text = state.hint
+                                    }
+                                }
+                            }
+                        }
+
+                    runOnUiThread {
+                        dialog.dismiss()
+                        Toast.makeText(this@SettingsActivity, "下载完成，准备安装…", Toast.LENGTH_SHORT).show()
+                    }
+
+                    TestApkUpdater.installApk(this@SettingsActivity, apkFile)
+                } catch (_: CancellationException) {
+                    runOnUiThread {
+                        dialog.dismiss()
+                        Toast.makeText(this@SettingsActivity, "已取消更新", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (t: Throwable) {
+                    AppLog.w("TestUpdate", "update failed: ${t.message}")
+                    runOnUiThread {
+                        dialog.dismiss()
+                        Toast.makeText(this@SettingsActivity, "更新失败：${t.message ?: "未知错误"}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
     }
 
     private fun showChoiceDialog(title: String, items: List<String>, current: String, onPicked: (String) -> Unit) {
