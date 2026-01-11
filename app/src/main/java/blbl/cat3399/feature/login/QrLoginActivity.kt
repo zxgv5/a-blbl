@@ -155,7 +155,7 @@ class QrLoginActivity : AppCompatActivity() {
     }
 
     private fun makeQr(text: String, size: Int): Bitmap {
-        val hints = mapOf(EncodeHintType.MARGIN to 1)
+        val hints = mapOf(EncodeHintType.MARGIN to 0)
         val matrix: BitMatrix = MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints)
         val pixels = IntArray(size * size)
         for (y in 0 until size) {

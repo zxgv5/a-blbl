@@ -4,14 +4,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/blbl_bg"
-    android:padding="20dp">
+    android:paddingVertical="20dp">
 
     <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_split"
+        android:id="@+id/guideline_left_20"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.73" />
+        app:layout_constraintGuide_percent="0.2" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_qr_end_50"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.56" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_panel_start_60"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.66" />
 
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/guideline_top"
@@ -32,25 +46,25 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@color/blbl_surface"
-        android:padding="12dp"
+        android:padding="6dp"
         android:scaleType="fitCenter"
         app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
         app:layout_constraintDimensionRatio="1:1"
-        app:layout_constraintEnd_toStartOf="@id/guideline_split"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/guideline_qr_end_50"
+        app:layout_constraintStart_toStartOf="@id/guideline_left_20"
         app:layout_constraintTop_toBottomOf="@id/guideline_top" />
 
     <LinearLayout
         android:id="@+id/panel_right"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="0dp"
-        android:layout_marginStart="18dp"
         android:gravity="center_vertical"
         android:orientation="vertical"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/guideline_split"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintStart_toStartOf="@id/guideline_panel_start_60"
+        app:layout_constraintTop_toTopOf="parent">
 
         <TextView
             android:id="@+id/tv_title"
