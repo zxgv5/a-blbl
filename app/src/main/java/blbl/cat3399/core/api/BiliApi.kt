@@ -7,6 +7,8 @@ import blbl.cat3399.core.model.BangumiSeasonDetail
 import blbl.cat3399.core.model.Danmaku
 import blbl.cat3399.core.model.FavFolder
 import blbl.cat3399.core.model.Following
+import blbl.cat3399.core.model.LiveAreaParent
+import blbl.cat3399.core.model.LiveRoomCard
 import blbl.cat3399.core.model.VideoCard
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.net.WebCookieMaintainer
@@ -70,6 +72,37 @@ object BiliApi {
         val page: Int,
         val hasMore: Boolean,
         val total: Int,
+    )
+
+    data class LiveRoomInfo(
+        val roomId: Long,
+        val uid: Long,
+        val title: String,
+        val liveStatus: Int,
+        val areaName: String?,
+        val parentAreaName: String?,
+    )
+
+    data class LivePlayUrl(
+        val currentQn: Int,
+        val acceptQn: List<Int>,
+        val qnDesc: Map<Int, String>,
+        val lines: List<LivePlayLine>,
+    )
+
+    data class LivePlayLine(
+        val order: Int,
+        val url: String,
+    )
+
+    data class LiveDanmuInfo(
+        val token: String,
+        val hosts: List<LiveDanmuHost>,
+    )
+
+    data class LiveDanmuHost(
+        val host: String,
+        val wssPort: Int,
     )
 
     suspend fun nav(): JSONObject {
@@ -196,6 +229,311 @@ object BiliApi {
             following = data.optLong("following"),
             follower = data.optLong("follower"),
         )
+    }
+
+    suspend fun liveAreas(): List<LiveAreaParent> {
+        val json = BiliClient.getJson("https://api.live.bilibili.com/room/v1/Area/getList")
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONArray("data") ?: JSONArray()
+        return withContext(Dispatchers.Default) { parseLiveAreas(data) }
+    }
+
+    suspend fun liveRecommend(page: Int = 1): List<LiveRoomCard> {
+        // This endpoint is public; keep params minimal to avoid extra risk controls.
+        val url =
+            BiliClient.withQuery(
+                "https://api.live.bilibili.com/xlive/web-interface/v1/webMain/getMoreRecList",
+                buildMap {
+                    put("platform", "web")
+                    put("page", page.coerceAtLeast(1).toString())
+                },
+            )
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val list = json.optJSONObject("data")?.optJSONArray("recommend_room_list") ?: JSONArray()
+        return withContext(Dispatchers.Default) { parseLiveRecommendRooms(list) }
+    }
+
+    suspend fun liveFollowing(page: Int = 1, pageSize: Int = 10): HasMorePage<LiveRoomCard> {
+        if (!BiliClient.cookies.hasSessData()) {
+            return HasMorePage(items = emptyList(), page = page.coerceAtLeast(1), hasMore = false, total = 0)
+        }
+        WebCookieMaintainer.ensureHealthyForPlay()
+        val url =
+            BiliClient.withQuery(
+                "https://api.live.bilibili.com/xlive/web-ucenter/user/following",
+                mapOf(
+                    "page" to page.coerceAtLeast(1).toString(),
+                    "page_size" to pageSize.coerceIn(1, 10).toString(),
+                    "ignoreRecord" to "1",
+                    "hit_ab" to "true",
+                ),
+            )
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONObject("data") ?: JSONObject()
+        val totalPage = data.optInt("totalPage", 1).coerceAtLeast(1)
+        val list = data.optJSONArray("list") ?: JSONArray()
+        val items = withContext(Dispatchers.Default) { parseLiveFollowingRooms(list) }
+        val p = page.coerceAtLeast(1)
+        return HasMorePage(items = items, page = p, hasMore = p < totalPage, total = data.optInt("count", 0))
+    }
+
+    suspend fun liveRoomInfo(roomId: Long): LiveRoomInfo {
+        val url =
+            BiliClient.withQuery(
+                "https://api.live.bilibili.com/room/v1/Room/get_info",
+                mapOf("room_id" to roomId.toString()),
+            )
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONObject("data") ?: JSONObject()
+        return LiveRoomInfo(
+            roomId = data.optLong("room_id").takeIf { it > 0 } ?: roomId,
+            uid = data.optLong("uid").takeIf { it > 0 } ?: 0L,
+            title = data.optString("title", ""),
+            liveStatus = data.optInt("live_status", 0),
+            areaName = data.optString("area_name", "").trim().takeIf { it.isNotBlank() },
+            parentAreaName = data.optString("parent_area_name", "").trim().takeIf { it.isNotBlank() },
+        )
+    }
+
+    suspend fun livePlayUrl(roomId: Long, qn: Int): LivePlayUrl {
+        val url =
+            BiliClient.withQuery(
+                "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo",
+                mapOf(
+                    "room_id" to roomId.toString(),
+                    "protocol" to "0", // http_stream
+                    "format" to "0", // flv
+                    "codec" to "0", // avc
+                    "qn" to qn.coerceAtLeast(1).toString(),
+                ),
+            )
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONObject("data") ?: JSONObject()
+        val playurl = data.optJSONObject("playurl_info")?.optJSONObject("playurl") ?: JSONObject()
+
+        val qnDesc = HashMap<Int, String>()
+        val descArr = playurl.optJSONArray("g_qn_desc") ?: JSONArray()
+        for (i in 0 until descArr.length()) {
+            val obj = descArr.optJSONObject(i) ?: continue
+            val q = obj.optInt("qn", 0).takeIf { it > 0 } ?: continue
+            val d = obj.optString("desc", "").trim()
+            if (d.isNotBlank()) qnDesc[q] = d
+        }
+
+        val streamArr = playurl.optJSONArray("stream") ?: JSONArray()
+        var pickedCodec: JSONObject? = null
+        loop@ for (i in 0 until streamArr.length()) {
+            val stream = streamArr.optJSONObject(i) ?: continue
+            val protocolName = stream.optString("protocol_name", "").lowercase()
+            if (!protocolName.contains("http_stream")) continue
+            val formats = stream.optJSONArray("format") ?: continue
+            for (j in 0 until formats.length()) {
+                val fmt = formats.optJSONObject(j) ?: continue
+                val formatName = fmt.optString("format_name", "").lowercase()
+                if (formatName != "flv") continue
+                val codecs = fmt.optJSONArray("codec") ?: continue
+                for (k in 0 until codecs.length()) {
+                    val c = codecs.optJSONObject(k) ?: continue
+                    val codecName = c.optString("codec_name", "").lowercase()
+                    if (codecName != "avc") continue
+                    pickedCodec = c
+                    break@loop
+                }
+            }
+        }
+        val codec = pickedCodec ?: JSONObject()
+        val currentQn = codec.optInt("current_qn", 0).takeIf { it > 0 } ?: qn
+        val accept = codec.optJSONArray("accept_qn") ?: JSONArray()
+        val acceptQn =
+            buildList {
+                for (i in 0 until accept.length()) {
+                    val v = accept.optInt(i, 0).takeIf { it > 0 } ?: continue
+                    add(v)
+                }
+            }.distinct()
+        val baseUrl = codec.optString("base_url", "").trim()
+        val urlInfo = codec.optJSONArray("url_info") ?: JSONArray()
+        val lines =
+            buildList {
+                for (i in 0 until urlInfo.length()) {
+                    val obj = urlInfo.optJSONObject(i) ?: continue
+                    val host = obj.optString("host", "").trim()
+                    val extra = obj.optString("extra", "").trim()
+                    if (host.isBlank() || baseUrl.isBlank()) continue
+                    val full = host + baseUrl + extra
+                    add(LivePlayLine(order = i + 1, url = full))
+                }
+            }
+
+        return LivePlayUrl(currentQn = currentQn, acceptQn = acceptQn, qnDesc = qnDesc, lines = lines)
+    }
+
+    suspend fun liveDanmuInfo(roomId: Long): LiveDanmuInfo {
+        WebCookieMaintainer.ensureWebFingerprintCookies()
+        val keys = BiliClient.ensureWbiKeys()
+        val url =
+            BiliClient.signedWbiUrlAbsolute(
+                "https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo",
+                params =
+                    mapOf(
+                        "id" to roomId.toString(),
+                        "type" to "0",
+                        "web_location" to "444.8",
+                    ),
+                keys = keys,
+            )
+        val json =
+            BiliClient.getJson(
+                url,
+                headers =
+                    mapOf(
+                        "Referer" to "https://live.bilibili.com/",
+                        "Origin" to "https://live.bilibili.com",
+                    ),
+            )
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONObject("data") ?: JSONObject()
+        val token = data.optString("token", "").trim()
+        val hostList = data.optJSONArray("host_list") ?: JSONArray()
+        val hosts =
+            buildList {
+                for (i in 0 until hostList.length()) {
+                    val obj = hostList.optJSONObject(i) ?: continue
+                    val host = obj.optString("host", "").trim()
+                    val wssPort = obj.optInt("wss_port", 0)
+                    if (host.isBlank() || wssPort <= 0) continue
+                    add(LiveDanmuHost(host = host, wssPort = wssPort))
+                }
+            }.distinctBy { "${it.host}:${it.wssPort}" }
+        return LiveDanmuInfo(token = token, hosts = hosts)
+    }
+
+    private fun parseLiveAreas(arr: JSONArray): List<LiveAreaParent> {
+        val out = ArrayList<LiveAreaParent>(arr.length())
+        for (i in 0 until arr.length()) {
+            val p = arr.optJSONObject(i) ?: continue
+            val id = p.optInt("id", 0)
+            val name = p.optString("name", "").trim()
+            if (id <= 0 || name.isBlank()) continue
+            val children = ArrayList<LiveAreaParent.Child>()
+            val list = p.optJSONArray("list") ?: JSONArray()
+            for (j in 0 until list.length()) {
+                val c = list.optJSONObject(j) ?: continue
+                val cid = c.optString("id", "").trim().toIntOrNull() ?: continue
+                val parentId = c.optString("parent_id", "").trim().toIntOrNull() ?: id
+                val cname = c.optString("name", "").trim()
+                if (cname.isBlank()) continue
+                children.add(
+                    LiveAreaParent.Child(
+                        id = cid,
+                        parentId = parentId,
+                        name = cname,
+                        hot = c.optInt("hot_status", 0) == 1,
+                        coverUrl = c.optString("pic", "").trim().takeIf { it.isNotBlank() },
+                    ),
+                )
+            }
+            out.add(LiveAreaParent(id = id, name = name, children = children))
+        }
+        return out
+    }
+
+    private fun parseLiveRecommendRooms(arr: JSONArray): List<LiveRoomCard> {
+        val out = ArrayList<LiveRoomCard>(arr.length())
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val roomId = obj.optLong("roomid").takeIf { it > 0 } ?: continue
+            val online = obj.optLong("online").takeIf { it > 0 } ?: 0L
+            out.add(
+                LiveRoomCard(
+                    roomId = roomId,
+                    uid = obj.optLong("uid").takeIf { it > 0 } ?: 0L,
+                    title = obj.optString("title", ""),
+                    uname = obj.optString("uname", ""),
+                    coverUrl = obj.optString("cover", "").trim(),
+                    faceUrl = obj.optString("face", "").trim().takeIf { it.isNotBlank() },
+                    online = online,
+                    isLive = true,
+                    parentAreaId = obj.optInt("area_v2_parent_id").takeIf { it > 0 },
+                    parentAreaName = obj.optString("area_v2_parent_name", "").trim().takeIf { it.isNotBlank() },
+                    areaId = obj.optInt("area_v2_id").takeIf { it > 0 },
+                    areaName = obj.optString("area_v2_name", "").trim().takeIf { it.isNotBlank() },
+                    keyframe = obj.optString("keyframe", "").trim().takeIf { it.isNotBlank() },
+                ),
+            )
+        }
+        return out
+    }
+
+    private fun parseLiveFollowingRooms(arr: JSONArray): List<LiveRoomCard> {
+        val out = ArrayList<LiveRoomCard>(arr.length())
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val roomId = obj.optLong("roomid").takeIf { it > 0 } ?: continue
+            val online = parseCnCount(obj.optString("text_small", "0").trim())
+            val liveStatus = obj.optInt("live_status", 0)
+            out.add(
+                LiveRoomCard(
+                    roomId = roomId,
+                    uid = obj.optLong("uid").takeIf { it > 0 } ?: 0L,
+                    title = obj.optString("title", ""),
+                    uname = obj.optString("uname", ""),
+                    coverUrl = obj.optString("room_cover", obj.optString("cover_from_user", "")).trim(),
+                    faceUrl = obj.optString("face", "").trim().takeIf { it.isNotBlank() },
+                    online = online,
+                    isLive = liveStatus == 1,
+                    parentAreaId = obj.optInt("parent_area_id").takeIf { it > 0 },
+                    parentAreaName = obj.optString("area_v2_parent_name", "").trim().takeIf { it.isNotBlank() },
+                    areaId = obj.optInt("area_id").takeIf { it > 0 },
+                    areaName = obj.optString("area_name_v2", obj.optString("area_name", "")).trim().takeIf { it.isNotBlank() },
+                    keyframe = null,
+                ),
+            )
+        }
+        return out
+    }
+
+    private fun parseCnCount(text: String): Long {
+        val t = text.trim()
+        if (t.isBlank()) return 0L
+        val m = Regex("^([0-9]+(?:\\.[0-9]+)?)([万亿]?)$").find(t) ?: return t.toLongOrNull() ?: 0L
+        val num = m.groupValues[1].toDoubleOrNull() ?: return 0L
+        val unit = m.groupValues[2]
+        val mul =
+            when (unit) {
+                "万" -> 10_000.0
+                "亿" -> 100_000_000.0
+                else -> 1.0
+            }
+        return (num * mul).toLong()
     }
 
     suspend fun historyCursor(
@@ -401,6 +739,7 @@ object BiliApi {
         pn: Int = 1,
         ps: Int = 15,
     ): PagedResult<BangumiSeason> {
+        if (type != 1 && type != 2) error("invalid bangumi follow type=$type")
         val url = BiliClient.withQuery(
             "https://api.bilibili.com/x/space/bangumi/follow/list",
             mapOf(
@@ -428,11 +767,23 @@ object BiliApi {
                 for (i in 0 until list.length()) {
                     val obj = list.optJSONObject(i) ?: continue
                     val seasonId = obj.optLong("season_id").takeIf { it > 0 } ?: continue
+                    val progressAny = obj.opt("progress")
+                    val progressText =
+                        when (progressAny) {
+                            is JSONObject -> {
+                                progressAny.optString("index_show").takeIf { it.isNotBlank() }
+                                    ?: progressAny.optInt("last_ep_index").takeIf { it > 0 }?.let { "看到第${it}话" }
+                            }
+                            is String -> progressAny.takeIf { it.isNotBlank() }
+                            else -> null
+                        }
                     out.add(
                         BangumiSeason(
                             seasonId = seasonId,
+                            seasonTypeName = obj.optString("season_type_name").takeIf { it.isNotBlank() },
                             title = obj.optString("title", ""),
                             coverUrl = obj.optString("cover").takeIf { it.isNotBlank() },
+                            progressText = progressText,
                             totalCount = obj.optInt("total_count").takeIf { it > 0 },
                             isFinish = obj.optInt("is_finish", -1).takeIf { it >= 0 }?.let { it == 1 },
                             newestEpIndex = obj.optInt("newest_ep_index").takeIf { it > 0 },
@@ -471,6 +822,9 @@ object BiliApi {
                     out.add(
                         BangumiEpisode(
                             epId = epId,
+                            aid = ep.optLong("aid").takeIf { it > 0 } ?: ep.optLong("avid").takeIf { it > 0 },
+                            cid = ep.optLong("cid").takeIf { it > 0 },
+                            bvid = ep.optString("bvid").takeIf { it.isNotBlank() },
                             title = ep.optString("title", ""),
                             longTitle = ep.optString("long_title", ""),
                             coverUrl = ep.optString("cover").takeIf { it.isNotBlank() },
@@ -547,7 +901,8 @@ object BiliApi {
     }
 
     suspend fun playUrlDash(bvid: String, cid: Long, qn: Int = 80, fnval: Int = 16): JSONObject {
-        WebCookieMaintainer.ensureHealthyForPlay()
+        WebCookieMaintainer.ensureWebFingerprintCookies()
+        WebCookieMaintainer.ensureDailyMaintenance()
         val keys = BiliClient.ensureWbiKeys()
         val hasSessData = BiliClient.cookies.hasSessData()
         val params =
@@ -599,6 +954,41 @@ object BiliApi {
                 throw e
             }
         }
+    }
+
+    suspend fun pgcPlayUrl(
+        bvid: String,
+        cid: Long? = null,
+        epId: Long? = null,
+        qn: Int = 80,
+        fnval: Int = 16,
+    ): JSONObject {
+        WebCookieMaintainer.ensureWebFingerprintCookies()
+        WebCookieMaintainer.ensureDailyMaintenance()
+        val params =
+            mutableMapOf(
+                "bvid" to bvid,
+                "qn" to qn.toString(),
+                "fnver" to "0",
+                "fnval" to fnval.toString(),
+                "fourk" to "1",
+                "from_client" to "BROWSER",
+                "drm_tech_type" to "2",
+            )
+        cid?.takeIf { it > 0 }?.let { params["cid"] = it.toString() }
+        epId?.takeIf { it > 0 }?.let { params["ep_id"] = it.toString() }
+        genPlayUrlSession()?.let { params["session"] = it }
+
+        val url = BiliClient.withQuery("https://api.bilibili.com/pgc/player/web/playurl", params)
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val result = json.optJSONObject("result") ?: JSONObject()
+        if (json.optJSONObject("data") == null) json.put("data", result)
+        return json
     }
 
     suspend fun playerWbiV2(bvid: String, cid: Long): JSONObject {

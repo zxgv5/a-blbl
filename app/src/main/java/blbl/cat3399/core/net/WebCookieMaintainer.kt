@@ -3,6 +3,8 @@ package blbl.cat3399.core.net
 import android.util.Base64
 import blbl.cat3399.core.log.AppLog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -40,8 +42,15 @@ object WebCookieMaintainer {
         KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
+    private val cookieRefreshMutex = Mutex()
+
     suspend fun ensureHealthyForPlay() {
         ensureWebFingerprintCookies()
+        ensureBiliTicket()
+        refreshCookieIfNeededOncePerDay()
+    }
+
+    suspend fun ensureDailyMaintenance() {
         ensureBiliTicket()
         refreshCookieIfNeededOncePerDay()
     }
@@ -128,59 +137,63 @@ object WebCookieMaintainer {
         if (!BiliClient.cookies.hasSessData()) return
         val refreshToken = BiliClient.prefs.webRefreshToken?.takeIf { it.isNotBlank() } ?: return
 
-        val nowMs = System.currentTimeMillis()
-        val epochDay = nowMs / 86_400_000L
-        if (BiliClient.prefs.webCookieRefreshCheckedEpochDay == epochDay) return
-        BiliClient.prefs.webCookieRefreshCheckedEpochDay = epochDay
+        cookieRefreshMutex.withLock {
+            val nowMs = System.currentTimeMillis()
+            val epochDay = nowMs / 86_400_000L
+            if (BiliClient.prefs.webCookieRefreshCheckedEpochDay == epochDay) return@withLock
 
-        val biliJct = BiliClient.cookies.getCookieValue("bili_jct")?.takeIf { it.isNotBlank() } ?: return
-        runCatching {
-            val infoUrl =
-                BiliClient.withQuery(
-                    "https://passport.bilibili.com/x/passport-login/web/cookie/info",
-                    mapOf("csrf" to biliJct),
-                )
-            val info = BiliClient.getJson(infoUrl)
-            val data = info.optJSONObject("data") ?: JSONObject()
-            val shouldRefresh = data.optBoolean("refresh", false)
-            if (!shouldRefresh) return@runCatching
-
-            val ts = data.optLong("timestamp", nowMs).takeIf { it > 0 } ?: nowMs
-            val correspondPath = withContext(Dispatchers.Default) { getCorrespondPath(ts) }
-            val html = BiliClient.requestString("https://www.bilibili.com/correspond/1/$correspondPath")
-            val refreshCsrf = refreshCsrfRegex.find(html)?.groupValues?.getOrNull(1).orEmpty()
-            if (refreshCsrf.isBlank()) error("refresh_csrf not found")
-
-            val refreshResult =
-                BiliClient.postFormJson(
-                    "https://passport.bilibili.com/x/passport-login/web/cookie/refresh",
-                    form =
-                        mapOf(
-                            "csrf" to biliJct,
-                            "refresh_csrf" to refreshCsrf,
-                            "source" to REFRESH_SOURCE,
-                            "refresh_token" to refreshToken,
-                        ),
-                )
-            val refreshData = refreshResult.optJSONObject("data") ?: JSONObject()
-            val newRefreshToken = refreshData.optString("refresh_token", "").trim()
-            if (newRefreshToken.isNotBlank()) BiliClient.prefs.webRefreshToken = newRefreshToken
-
-            val newBiliJct = BiliClient.cookies.getCookieValue("bili_jct")?.takeIf { it.isNotBlank() } ?: biliJct
+            val biliJct = BiliClient.cookies.getCookieValue("bili_jct")?.takeIf { it.isNotBlank() } ?: return@withLock
             runCatching {
-                BiliClient.postFormJson(
-                    "https://passport.bilibili.com/x/passport-login/web/confirm/refresh",
-                    form =
-                        mapOf(
-                            "csrf" to newBiliJct,
-                            "refresh_token" to refreshToken,
-                        ),
-                )
+                val infoUrl =
+                    BiliClient.withQuery(
+                        "https://passport.bilibili.com/x/passport-login/web/cookie/info",
+                        mapOf("csrf" to biliJct),
+                    )
+                val info = BiliClient.getJson(infoUrl)
+                val data = info.optJSONObject("data") ?: JSONObject()
+                val shouldRefresh = data.optBoolean("refresh", false)
+                if (!shouldRefresh) return@runCatching
+
+                val ts = data.optLong("timestamp", nowMs).takeIf { it > 0 } ?: nowMs
+                val correspondPath = withContext(Dispatchers.Default) { getCorrespondPath(ts) }
+                val html = BiliClient.requestString("https://www.bilibili.com/correspond/1/$correspondPath")
+                val refreshCsrf = refreshCsrfRegex.find(html)?.groupValues?.getOrNull(1).orEmpty()
+                if (refreshCsrf.isBlank()) error("refresh_csrf not found")
+
+                val refreshResult =
+                    BiliClient.postFormJson(
+                        "https://passport.bilibili.com/x/passport-login/web/cookie/refresh",
+                        form =
+                            mapOf(
+                                "csrf" to biliJct,
+                                "refresh_csrf" to refreshCsrf,
+                                "source" to REFRESH_SOURCE,
+                                "refresh_token" to refreshToken,
+                            ),
+                    )
+                val refreshData = refreshResult.optJSONObject("data") ?: JSONObject()
+                val newRefreshToken = refreshData.optString("refresh_token", "").trim()
+                if (newRefreshToken.isNotBlank()) BiliClient.prefs.webRefreshToken = newRefreshToken
+
+                val newBiliJct = BiliClient.cookies.getCookieValue("bili_jct")?.takeIf { it.isNotBlank() } ?: biliJct
+                runCatching {
+                    BiliClient.postFormJson(
+                        "https://passport.bilibili.com/x/passport-login/web/confirm/refresh",
+                        form =
+                            mapOf(
+                                "csrf" to newBiliJct,
+                                "refresh_token" to refreshToken,
+                            ),
+                    )
+                }
+
+                AppLog.i(TAG, "web cookie refreshed")
+            }.onFailure {
+                AppLog.w(TAG, "refreshCookieIfNeededOncePerDay failed", it)
+                return@withLock
             }
 
-            AppLog.i(TAG, "web cookie refreshed")
-        }.onFailure {
-            AppLog.w(TAG, "refreshCookieIfNeededOncePerDay failed", it)
+            BiliClient.prefs.webCookieRefreshCheckedEpochDay = epochDay
         }
     }
 
