@@ -40,39 +40,129 @@ class LiveMessageClient(
         Thread(r, "blbl-live-ws").apply { isDaemon = true }
     }
     private var heartbeatTask: ScheduledFuture<*>? = null
+    private var authTimeoutTask: ScheduledFuture<*>? = null
+    private var reconnectTask: ScheduledFuture<*>? = null
 
     private var ws: WebSocket? = null
     @Volatile private var seq: Int = 1
+    @Volatile private var authed: Boolean = false
+    @Volatile private var closed: Boolean = false
+    @Volatile private var reconnectAttempt: Int = 0
+    @Volatile private var hostIndex: Int = 0
+
+    private var token: String = ""
+    private var hosts: List<BiliApi.LiveDanmuHost> = emptyList()
 
     suspend fun connect() {
+        closed = false
+        reconnectAttempt = 0
+        hostIndex = 0
+
         val info = BiliApi.liveDanmuInfo(roomId)
-        val host = info.hosts.firstOrNull()
-        if (host == null || info.token.isBlank()) {
+        val token = info.token
+        val hosts = preferHosts(info.hosts)
+        if (hosts.isEmpty() || token.isBlank()) {
             onStatus("弹幕连接信息为空")
             return
         }
-        val url = "wss://${host.host}:${host.wssPort}/sub"
-        onStatus("连接弹幕：${host.host}:${host.wssPort}")
+        this.token = token
+        this.hosts = hosts
+        connectCurrentHost()
+    }
+
+    private fun preferHosts(hosts: List<BiliApi.LiveDanmuHost>): List<BiliApi.LiveDanmuHost> {
+        if (hosts.isEmpty()) return emptyList()
+        val (preferred, others) = hosts.partition { it.host == "broadcastlv.chat.bilibili.com" }
+        return preferred + others
+    }
+
+    fun close() {
+        closed = true
+        heartbeatTask?.cancel(true)
+        heartbeatTask = null
+        authTimeoutTask?.cancel(true)
+        authTimeoutTask = null
+        reconnectTask?.cancel(true)
+        reconnectTask = null
+        ws?.close(1000, "bye")
+        ws = null
+        scheduler.shutdownNow()
+    }
+
+    private fun connectCurrentHost() {
+        if (closed) return
+        val host = hosts.getOrNull(hostIndex)
+        if (host == null) {
+            onStatus("弹幕连接节点为空")
+            return
+        }
+
+        authed = false
+        heartbeatTask?.cancel(true)
+        heartbeatTask = null
+        authTimeoutTask?.cancel(true)
+        authTimeoutTask = null
+
+        runCatching { ws?.close(1000, "reconnect") }
+        ws = null
+
+        val (scheme, port) =
+            when {
+                host.wssPort > 0 -> "wss" to host.wssPort
+                host.wsPort > 0 -> "ws" to host.wsPort
+                else -> "wss" to 443
+            }
+
+        val url = "$scheme://${host.host}:$port/sub"
+        onStatus("连接弹幕：${host.host}:$port")
 
         val req =
             Request.Builder()
                 .url(url)
                 .header("User-Agent", BiliClient.prefs.userAgent)
                 .header("Referer", "https://live.bilibili.com/")
+                .header("Origin", "https://www.bilibili.com")
                 .build()
-        ws = BiliClient.apiOkHttp.newWebSocket(req, Listener(info.token))
+        ws = BiliClient.apiOkHttp.newWebSocket(req, Listener())
     }
 
-    fun close() {
+    private fun scheduleReconnect(reason: String) {
+        if (closed) return
+        if (hosts.isEmpty()) return
+        if (reconnectTask?.isDone == false) return
+
+        val delaySec = (1L shl reconnectAttempt.coerceIn(0, 4)).coerceAtMost(10L)
+        reconnectAttempt++
+        hostIndex = (hostIndex + 1).mod(hosts.size)
+        val host = hosts[hostIndex]
+        onStatus("弹幕重连($reconnectAttempt)：${delaySec}s 后尝试 ${host.host}")
+        reconnectTask =
+            scheduler.schedule(
+                { connectCurrentHost() },
+                delaySec,
+                TimeUnit.SECONDS,
+            )
+        AppLog.w("LiveWs", "scheduleReconnect roomId=$roomId reason=$reason")
+    }
+
+    private fun startHeartbeat() {
+        if (closed) return
         heartbeatTask?.cancel(true)
         heartbeatTask = null
-        ws?.close(1000, "bye")
-        ws = null
-        scheduler.shutdownNow()
+
+        heartbeatTask =
+            scheduler.scheduleAtFixedRate(
+                {
+                    val hb = "[object Object]".toByteArray(Charsets.UTF_8)
+                    ws?.send(ByteString.of(*buildPacket(op = OP_HEARTBEAT, ver = 1, body = hb)))
+                },
+                30,
+                30,
+                TimeUnit.SECONDS,
+            )
     }
 
     private inner class Listener(
-        private val token: String,
     ) : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             onStatus("弹幕已连接")
@@ -80,7 +170,7 @@ class LiveMessageClient(
                 JSONObject()
                     .put("uid", 0)
                     .put("roomid", roomId)
-                    .put("protover", 2) // prefer zlib packets
+                    .put("protover", 3) // allow brotli/zlib packets
                     .put("platform", "web")
                     .put("type", 2)
                     .put("key", token)
@@ -88,15 +178,17 @@ class LiveMessageClient(
                     .toByteArray(Charsets.UTF_8)
             webSocket.send(ByteString.of(*buildPacket(op = OP_AUTH, ver = 1, body = body)))
 
-            heartbeatTask?.cancel(true)
-            heartbeatTask =
-                scheduler.scheduleAtFixedRate(
+            authTimeoutTask?.cancel(true)
+            authTimeoutTask =
+                scheduler.schedule(
                     {
-                        val hb = "[object Object]".toByteArray(Charsets.UTF_8)
-                        ws?.send(ByteString.of(*buildPacket(op = OP_HEARTBEAT, ver = 1, body = hb)))
+                        if (!authed && !closed) {
+                            onStatus("弹幕认证超时，准备重连")
+                            scheduleReconnect("auth timeout")
+                            runCatching { ws?.close(1000, "auth timeout") }
+                        }
                     },
-                    0,
-                    30,
+                    6,
                     TimeUnit.SECONDS,
                 )
         }
@@ -110,10 +202,18 @@ class LiveMessageClient(
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             onStatus("弹幕连接失败：${t.message}")
             AppLog.w("LiveWs", "onFailure roomId=$roomId code=${response?.code}", t)
+            scheduleReconnect("onFailure code=${response?.code} ${t::class.java.simpleName}:${t.message}")
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             onStatus("弹幕断开：$code $reason")
+            runCatching { webSocket.close(code, reason) }
+            scheduleReconnect("onClosing $code $reason")
+        }
+
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            onStatus("弹幕已断开：$code $reason")
+            scheduleReconnect("onClosed $code $reason")
         }
     }
 
@@ -136,7 +236,20 @@ class LiveMessageClient(
                         handleJsonMessage(payload)
                     }
                 }
-                OP_AUTH_REPLY -> onStatus("弹幕认证成功")
+                OP_AUTH_REPLY -> {
+                    val text = packet.body.toString(Charsets.UTF_8).trim()
+                    val code = runCatching { JSONObject(text).optInt("code", -1) }.getOrDefault(-1)
+                    if (code == 0) {
+                        authed = true
+                        reconnectAttempt = 0
+                        onStatus("弹幕认证成功")
+                        startHeartbeat()
+                    } else {
+                        onStatus("弹幕认证失败：$text")
+                        scheduleReconnect("auth failed $text")
+                        runCatching { ws?.close(1000, "auth failed") }
+                    }
+                }
                 else -> Unit
             }
         }
@@ -254,4 +367,3 @@ class LiveMessageClient(
         private const val OP_AUTH_REPLY = 8
     }
 }
-

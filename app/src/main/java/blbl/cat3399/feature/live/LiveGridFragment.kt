@@ -196,7 +196,7 @@ class LiveGridFragment : Fragment() {
 
                 if (filtered.isNotEmpty()) {
                     if (page == 1) adapter.submit(filtered) else adapter.append(filtered)
-                    binding.recycler.post { maybeConsumePendingFocusFirstCard() }
+                    _binding?.recycler?.post { maybeConsumePendingFocusFirstCard() }
                 }
 
                 // Recommend endpoint can return lots of unrelated areas; keep fetching a bit when filtered empty.
@@ -212,9 +212,9 @@ class LiveGridFragment : Fragment() {
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 AppLog.e("LiveGrid", "load failed src=$source pid=$parentAreaId page=$page", t)
-                Toast.makeText(requireContext(), "加载失败，可查看 Logcat(标签 BLBL)", Toast.LENGTH_SHORT).show()
+                context?.let { Toast.makeText(it, "加载失败，可查看 Logcat(标签 BLBL)", Toast.LENGTH_SHORT).show() }
             } finally {
-                if (isRefresh && token == requestToken) binding.swipeRefresh.isRefreshing = false
+                if (isRefresh && token == requestToken) _binding?.swipeRefresh?.isRefreshing = false
                 isLoadingMore = false
             }
         }
@@ -368,4 +368,3 @@ class LiveGridFragment : Fragment() {
             }
     }
 }
-
