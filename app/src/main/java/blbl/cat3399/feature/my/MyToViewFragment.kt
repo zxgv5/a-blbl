@@ -94,6 +94,13 @@ class MyToViewFragment : Fragment(), MyTabSwitchFocusTarget {
                                 val itemView = binding.recycler.findContainingItemView(v) ?: return@setOnKeyListener false
                                 val next = FocusFinder.getInstance().findNextFocus(binding.recycler, itemView, View.FOCUS_DOWN)
                                 if (next == null || !isDescendantOf(next, binding.recycler)) {
+                                    if (binding.recycler.canScrollVertically(1)) {
+                                        // Focus-search failed but the list can still scroll; scroll a bit to let
+                                        // RecyclerView lay out the next row, and keep focus inside the list.
+                                        val dy = (itemView.height * 0.8f).toInt().coerceAtLeast(1)
+                                        binding.recycler.scrollBy(0, dy)
+                                        return@setOnKeyListener true
+                                    }
                                     return@setOnKeyListener true
                                 }
                                 false

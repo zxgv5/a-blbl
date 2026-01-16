@@ -117,4 +117,60 @@
     <dimen name="search_hot_icon_margin_end_tv">12dp</dimen>
     <dimen name="search_hot_text_size">14sp</dimen>
     <dimen name="search_hot_text_size_tv">18sp</dimen>
+
+    <!-- Player: top/bottom controls -->
+    <dimen name="player_top_bar_padding_h">6dp</dimen>
+    <dimen name="player_top_bar_padding_v">6dp</dimen>
+    <dimen name="player_top_bar_padding_h_tv">12dp</dimen>
+    <dimen name="player_top_bar_padding_v_tv">10dp</dimen>
+
+    <dimen name="player_top_button_size">40dp</dimen>
+    <dimen name="player_top_button_size_tv">60dp</dimen>
+    <dimen name="player_top_button_padding">4dp</dimen>
+    <dimen name="player_top_button_padding_tv">5dp</dimen>
+
+    <dimen name="player_title_margin_start">6dp</dimen>
+    <dimen name="player_title_margin_end">8dp</dimen>
+    <dimen name="player_title_margin_start_tv">12dp</dimen>
+    <dimen name="player_title_margin_end_tv">12dp</dimen>
+    <dimen name="player_title_text_size">16sp</dimen>
+    <dimen name="player_title_text_size_tv">22sp</dimen>
+
+    <dimen name="player_online_text_size">12sp</dimen>
+    <dimen name="player_online_text_size_tv">16sp</dimen>
+
+    <dimen name="player_bottom_bar_padding_v">10dp</dimen>
+    <dimen name="player_bottom_bar_padding_v_tv">16dp</dimen>
+    <dimen name="player_seekbar_height">10dp</dimen>
+    <dimen name="player_seekbar_height_tv">14dp</dimen>
+    <dimen name="player_seekbar_margin_bottom">6dp</dimen>
+    <dimen name="player_seekbar_margin_bottom_tv">10dp</dimen>
+
+    <dimen name="player_controls_row_height">42dp</dimen>
+    <dimen name="player_controls_row_height_tv">60dp</dimen>
+    <dimen name="player_controls_row_margin_start">8dp</dimen>
+    <dimen name="player_controls_row_margin_end">6dp</dimen>
+    <dimen name="player_controls_row_margin_start_tv">16dp</dimen>
+    <dimen name="player_controls_row_margin_end_tv">12dp</dimen>
+
+    <dimen name="player_control_button_size">36dp</dimen>
+    <dimen name="player_control_button_size_tv">56dp</dimen>
+    <dimen name="player_control_button_padding">4dp</dimen>
+    <dimen name="player_control_button_padding_tv">5dp</dimen>
+
+    <dimen name="player_time_margin_end">8dp</dimen>
+    <dimen name="player_time_margin_end_tv">12dp</dimen>
+    <dimen name="player_time_text_size">14sp</dimen>
+    <dimen name="player_time_text_size_tv">18sp</dimen>
+
+    <dimen name="player_seek_hint_margin_start">14dp</dimen>
+    <dimen name="player_seek_hint_margin_bottom">14dp</dimen>
+    <dimen name="player_seek_hint_margin_start_tv">20dp</dimen>
+    <dimen name="player_seek_hint_margin_bottom_tv">20dp</dimen>
+    <dimen name="player_seek_hint_padding_h">10dp</dimen>
+    <dimen name="player_seek_hint_padding_v">6dp</dimen>
+    <dimen name="player_seek_hint_padding_h_tv">14dp</dimen>
+    <dimen name="player_seek_hint_padding_v_tv">10dp</dimen>
+    <dimen name="player_seek_hint_text_size">16sp</dimen>
+    <dimen name="player_seek_hint_text_size_tv">22sp</dimen>
 </resources>

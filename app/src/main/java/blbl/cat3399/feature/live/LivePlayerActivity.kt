@@ -3,8 +3,10 @@ package blbl.cat3399.feature.live
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -19,6 +21,7 @@ import blbl.cat3399.core.api.BiliApiException
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.model.Danmaku
 import blbl.cat3399.core.net.BiliClient
+import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
 import blbl.cat3399.databinding.ActivityPlayerBinding
 import blbl.cat3399.databinding.DialogLiveChatBinding
@@ -59,6 +62,7 @@ class LivePlayerActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
+        applyUiMode()
 
         roomId = intent.getLongExtra(EXTRA_ROOM_ID, 0L)
         roomTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -134,6 +138,11 @@ class LivePlayerActivity : AppCompatActivity() {
         lifecycleScope.launch { loadAndPlay(initial = true) }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyUiMode()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
@@ -147,6 +156,118 @@ class LivePlayerActivity : AppCompatActivity() {
         player?.release()
         player = null
         super.onDestroy()
+    }
+
+    private fun applyUiMode() {
+        val tvMode = TvMode.isEnabled(this)
+
+        fun px(id: Int): Int = resources.getDimensionPixelSize(id)
+        fun pxF(id: Int): Float = resources.getDimension(id)
+
+        val topPadH = px(if (tvMode) blbl.cat3399.R.dimen.player_top_bar_padding_h_tv else blbl.cat3399.R.dimen.player_top_bar_padding_h)
+        val topPadV = px(if (tvMode) blbl.cat3399.R.dimen.player_top_bar_padding_v_tv else blbl.cat3399.R.dimen.player_top_bar_padding_v)
+        if (
+            binding.topBar.paddingLeft != topPadH ||
+            binding.topBar.paddingRight != topPadH ||
+            binding.topBar.paddingTop != topPadV ||
+            binding.topBar.paddingBottom != topPadV
+        ) {
+            binding.topBar.setPadding(topPadH, topPadV, topPadH, topPadV)
+        }
+
+        val topBtnSize = px(if (tvMode) blbl.cat3399.R.dimen.player_top_button_size_tv else blbl.cat3399.R.dimen.player_top_button_size)
+        val topBtnPad = px(if (tvMode) blbl.cat3399.R.dimen.player_top_button_padding_tv else blbl.cat3399.R.dimen.player_top_button_padding)
+        setSize(binding.btnBack, topBtnSize, topBtnSize)
+        binding.btnBack.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
+        setSize(binding.btnSettings, topBtnSize, topBtnSize)
+        binding.btnSettings.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
+
+        binding.tvTitle.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) blbl.cat3399.R.dimen.player_title_text_size_tv else blbl.cat3399.R.dimen.player_title_text_size),
+        )
+
+        binding.tvOnline.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) blbl.cat3399.R.dimen.player_online_text_size_tv else blbl.cat3399.R.dimen.player_online_text_size),
+        )
+
+        val bottomPadV = px(if (tvMode) blbl.cat3399.R.dimen.player_bottom_bar_padding_v_tv else blbl.cat3399.R.dimen.player_bottom_bar_padding_v)
+        if (binding.bottomBar.paddingTop != bottomPadV || binding.bottomBar.paddingBottom != bottomPadV) {
+            binding.bottomBar.setPadding(
+                binding.bottomBar.paddingLeft,
+                bottomPadV,
+                binding.bottomBar.paddingRight,
+                bottomPadV,
+            )
+        }
+
+        (binding.seekProgress.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val height = px(if (tvMode) blbl.cat3399.R.dimen.player_seekbar_height_tv else blbl.cat3399.R.dimen.player_seekbar_height)
+            val mb =
+                px(if (tvMode) blbl.cat3399.R.dimen.player_seekbar_margin_bottom_tv else blbl.cat3399.R.dimen.player_seekbar_margin_bottom)
+            if (lp.height != height || lp.bottomMargin != mb) {
+                lp.height = height
+                lp.bottomMargin = mb
+                binding.seekProgress.layoutParams = lp
+            }
+        }
+
+        (binding.controlsRow.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val height = px(if (tvMode) blbl.cat3399.R.dimen.player_controls_row_height_tv else blbl.cat3399.R.dimen.player_controls_row_height)
+            val ms =
+                px(if (tvMode) blbl.cat3399.R.dimen.player_controls_row_margin_start_tv else blbl.cat3399.R.dimen.player_controls_row_margin_start)
+            val me = px(if (tvMode) blbl.cat3399.R.dimen.player_controls_row_margin_end_tv else blbl.cat3399.R.dimen.player_controls_row_margin_end)
+            if (lp.height != height || lp.marginStart != ms || lp.marginEnd != me) {
+                lp.height = height
+                lp.marginStart = ms
+                lp.marginEnd = me
+                binding.controlsRow.layoutParams = lp
+            }
+        }
+
+        val controlSize = px(if (tvMode) blbl.cat3399.R.dimen.player_control_button_size_tv else blbl.cat3399.R.dimen.player_control_button_size)
+        val controlPad =
+            px(if (tvMode) blbl.cat3399.R.dimen.player_control_button_padding_tv else blbl.cat3399.R.dimen.player_control_button_padding)
+        listOf(
+            binding.btnPlayPause,
+            binding.btnRew,
+            binding.btnFfwd,
+            binding.btnSubtitle,
+            binding.btnDanmaku,
+            binding.btnAdvanced,
+        ).forEach { btn ->
+            setSize(btn, controlSize, controlSize)
+            btn.setPadding(controlPad, controlPad, controlPad, controlPad)
+        }
+
+        binding.tvTime.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) blbl.cat3399.R.dimen.player_time_text_size_tv else blbl.cat3399.R.dimen.player_time_text_size),
+        )
+
+        binding.tvSeekHint.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) blbl.cat3399.R.dimen.player_seek_hint_text_size_tv else blbl.cat3399.R.dimen.player_seek_hint_text_size),
+        )
+        val hintPadH = px(if (tvMode) blbl.cat3399.R.dimen.player_seek_hint_padding_h_tv else blbl.cat3399.R.dimen.player_seek_hint_padding_h)
+        val hintPadV = px(if (tvMode) blbl.cat3399.R.dimen.player_seek_hint_padding_v_tv else blbl.cat3399.R.dimen.player_seek_hint_padding_v)
+        if (
+            binding.tvSeekHint.paddingLeft != hintPadH ||
+            binding.tvSeekHint.paddingRight != hintPadH ||
+            binding.tvSeekHint.paddingTop != hintPadV ||
+            binding.tvSeekHint.paddingBottom != hintPadV
+        ) {
+            binding.tvSeekHint.setPadding(hintPadH, hintPadV, hintPadH, hintPadV)
+        }
+    }
+
+    private fun setSize(view: View, widthPx: Int, heightPx: Int) {
+        val lp = view.layoutParams ?: return
+        if (lp.width == widthPx && lp.height == heightPx) return
+        lp.width = widthPx
+        lp.height = heightPx
+        view.layoutParams = lp
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

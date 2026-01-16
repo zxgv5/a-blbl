@@ -1085,29 +1085,34 @@ object BiliApi {
     }
 
     suspend fun dmSeg(cid: Long, segmentIndex: Int): List<Danmaku> {
-        val url = BiliClient.withQuery(
-            "https://api.bilibili.com/x/v2/dm/web/seg.so",
-            mapOf(
-                "type" to "1",
-                "oid" to cid.toString(),
-                "segment_index" to segmentIndex.toString(),
-            ),
-        )
-        val bytes = BiliClient.getBytes(url, headers = piliWebHeaders(includeCookie = true), noCookies = true)
-        val reply = DmSegMobileReply.parseFrom(bytes)
-        val list = reply.elemsList.mapNotNull { e ->
-            val text = e.content ?: return@mapNotNull null
-            Danmaku(
-                timeMs = e.progress,
-                mode = e.mode,
-                text = text,
-                color = e.color.toInt(),
-                fontSize = e.fontsize,
-                weight = e.weight,
+        try {
+            val url = BiliClient.withQuery(
+                "https://api.bilibili.com/x/v2/dm/web/seg.so",
+                mapOf(
+                    "type" to "1",
+                    "oid" to cid.toString(),
+                    "segment_index" to segmentIndex.toString(),
+                ),
             )
+            val bytes = BiliClient.getBytes(url, headers = piliWebHeaders(includeCookie = true), noCookies = true)
+            val reply = DmSegMobileReply.parseFrom(bytes)
+            val list = reply.elemsList.mapNotNull { e ->
+                val text = e.content ?: return@mapNotNull null
+                Danmaku(
+                    timeMs = e.progress,
+                    mode = e.mode,
+                    text = text,
+                    color = e.color.toInt(),
+                    fontSize = e.fontsize,
+                    weight = e.weight,
+                )
+            }
+            AppLog.d(TAG, "dmSeg cid=$cid seg=$segmentIndex bytes=${bytes.size} size=${list.size} state=${reply.state}")
+            return list
+        } catch (t: Throwable) {
+            AppLog.w(TAG, "dmSeg failed cid=$cid seg=$segmentIndex", t)
+            throw t
         }
-        AppLog.d(TAG, "dmSeg cid=$cid seg=$segmentIndex size=${list.size} state=${reply.state}")
-        return list
     }
 
     suspend fun dmWebView(cid: Long, aid: Long? = null): DanmakuWebView {

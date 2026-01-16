@@ -3,10 +3,12 @@ package blbl.cat3399.feature.player
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -30,12 +32,14 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import androidx.media3.ui.CaptionStyleCompat
+import blbl.cat3399.R
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.api.BiliApiException
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.model.DanmakuShield
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.prefs.AppPrefs
+import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
 import blbl.cat3399.databinding.ActivityPlayerBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -119,6 +123,7 @@ class PlayerActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
+        applyUiMode()
 
         binding.topBar.visibility = View.GONE
         binding.bottomBar.visibility = View.GONE
@@ -404,6 +409,11 @@ class PlayerActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyUiMode()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -1758,10 +1768,13 @@ class PlayerActivity : AppCompatActivity() {
         return withContext(Dispatchers.IO) {
             val prefs = BiliClient.prefs
             val followBili = prefs.danmakuFollowBiliShield
+            if (session.debugEnabled) {
+                AppLog.d("Player", "danmakuMeta cid=$cid aid=${aid ?: -1} followBili=$followBili hasSess=${BiliClient.cookies.hasSessData()}")
+            }
             val dmView = if (followBili && BiliClient.cookies.hasSessData()) {
                 val t0 = SystemClock.elapsedRealtime()
                 runCatching { BiliApi.dmWebView(cid, aid) }
-                    .onFailure { AppLog.w("Player", "dmWebView failed: ${it.message}") }
+                    .onFailure { AppLog.w("Player", "dmWebView failed", it) }
                     .getOrNull()
                     .also {
                         val cost = SystemClock.elapsedRealtime() - t0
@@ -1802,10 +1815,20 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun requestDanmakuSegmentsForPosition(positionMs: Long, immediate: Boolean) {
-        if (danmakuShield == null) return
-        if (!session.danmaku.enabled) return
+        val debug = session.debugEnabled
+        if (danmakuShield == null) {
+            if (debug) AppLog.d("Player", "danmaku prefetch skipped: shield=null")
+            return
+        }
+        if (!session.danmaku.enabled) {
+            if (debug) AppLog.d("Player", "danmaku prefetch skipped: disabled")
+            return
+        }
         val now = SystemClock.uptimeMillis()
-        if (!immediate && now - lastDanmakuPrefetchAtMs < DANMAKU_PREFETCH_INTERVAL_MS) return
+        if (!immediate && now - lastDanmakuPrefetchAtMs < DANMAKU_PREFETCH_INTERVAL_MS) {
+            if (debug) AppLog.d("Player", "danmaku prefetch skipped: interval")
+            return
+        }
         lastDanmakuPrefetchAtMs = now
 
         val cid = currentCid.takeIf { it > 0 } ?: return
@@ -1820,14 +1843,34 @@ class PlayerActivity : AppCompatActivity() {
 
         if (toLoad.isEmpty()) return
 
+        if (debug) {
+            AppLog.d(
+                "Player",
+                "danmaku prefetch cid=$cid pos=${positionMs}ms segSizeMs=$segSize targetSeg=$targetSeg toLoad=${toLoad.joinToString()} segTotal=$danmakuSegmentTotal",
+            )
+        }
+
         lifecycleScope.launch(Dispatchers.IO) {
             val shield = danmakuShield
             val newItems = ArrayList<blbl.cat3399.core.model.Danmaku>()
             val loaded = ArrayList<Int>()
             for (seg in toLoad) {
+                val t0 = SystemClock.elapsedRealtime()
                 val list = runCatching { BiliApi.dmSeg(cid, seg) }.getOrNull()
-                if (list == null) continue
+                val cost = SystemClock.elapsedRealtime() - t0
+                if (list == null) {
+                    if (debug) AppLog.d("Player", "danmaku seg=$seg fetch failed cost=${cost}ms")
+                    continue
+                }
+                val before = list.size
                 val filtered = if (shield != null) list.filter(shield::allow) else list
+                val after = filtered.size
+                if (debug) {
+                    AppLog.d("Player", "danmaku seg=$seg items=$before kept=$after cost=${cost}ms")
+                }
+                if (before > 0 && after == 0 && debug) {
+                    AppLog.d("Player", "danmaku seg=$seg filteredAll (shield)")
+                }
                 if (filtered.isNotEmpty()) newItems.addAll(filtered)
                 loaded.add(seg)
             }
@@ -1840,6 +1883,8 @@ class PlayerActivity : AppCompatActivity() {
                     trimDanmakuCacheIfNeeded(positionMs)
                     binding.danmakuView.setDanmakus(danmakuAll)
                     binding.danmakuView.notifySeek(positionMs)
+                } else if (debug) {
+                    AppLog.d("Player", "danmaku loadedSegs=${loaded.joinToString()} but no new items (after filter)")
                 }
             }
         }
@@ -2032,6 +2077,140 @@ class PlayerActivity : AppCompatActivity() {
                 speedLevel = speedLevel,
                 area = area,
             )
+    }
+
+    private fun applyUiMode() {
+        val tvMode = TvMode.isEnabled(this)
+
+        fun px(id: Int): Int = resources.getDimensionPixelSize(id)
+        fun pxF(id: Int): Float = resources.getDimension(id)
+
+        val topPadH = px(if (tvMode) R.dimen.player_top_bar_padding_h_tv else R.dimen.player_top_bar_padding_h)
+        val topPadV = px(if (tvMode) R.dimen.player_top_bar_padding_v_tv else R.dimen.player_top_bar_padding_v)
+        if (
+            binding.topBar.paddingLeft != topPadH ||
+            binding.topBar.paddingRight != topPadH ||
+            binding.topBar.paddingTop != topPadV ||
+            binding.topBar.paddingBottom != topPadV
+        ) {
+            binding.topBar.setPadding(topPadH, topPadV, topPadH, topPadV)
+        }
+
+        val topBtnSize = px(if (tvMode) R.dimen.player_top_button_size_tv else R.dimen.player_top_button_size)
+        val topBtnPad = px(if (tvMode) R.dimen.player_top_button_padding_tv else R.dimen.player_top_button_padding)
+        setSize(binding.btnBack, topBtnSize, topBtnSize)
+        binding.btnBack.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
+        setSize(binding.btnSettings, topBtnSize, topBtnSize)
+        binding.btnSettings.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
+
+        binding.tvTitle.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) R.dimen.player_title_text_size_tv else R.dimen.player_title_text_size),
+        )
+        (binding.tvTitle.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val ms = px(if (tvMode) R.dimen.player_title_margin_start_tv else R.dimen.player_title_margin_start)
+            val me = px(if (tvMode) R.dimen.player_title_margin_end_tv else R.dimen.player_title_margin_end)
+            if (lp.marginStart != ms || lp.marginEnd != me) {
+                lp.marginStart = ms
+                lp.marginEnd = me
+                binding.tvTitle.layoutParams = lp
+            }
+        }
+
+        binding.tvOnline.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) R.dimen.player_online_text_size_tv else R.dimen.player_online_text_size),
+        )
+
+        val bottomPadV = px(if (tvMode) R.dimen.player_bottom_bar_padding_v_tv else R.dimen.player_bottom_bar_padding_v)
+        if (binding.bottomBar.paddingTop != bottomPadV || binding.bottomBar.paddingBottom != bottomPadV) {
+            binding.bottomBar.setPadding(
+                binding.bottomBar.paddingLeft,
+                bottomPadV,
+                binding.bottomBar.paddingRight,
+                bottomPadV,
+            )
+        }
+
+        (binding.seekProgress.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val height = px(if (tvMode) R.dimen.player_seekbar_height_tv else R.dimen.player_seekbar_height)
+            val mb = px(if (tvMode) R.dimen.player_seekbar_margin_bottom_tv else R.dimen.player_seekbar_margin_bottom)
+            if (lp.height != height || lp.bottomMargin != mb) {
+                lp.height = height
+                lp.bottomMargin = mb
+                binding.seekProgress.layoutParams = lp
+            }
+        }
+
+        (binding.controlsRow.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val height = px(if (tvMode) R.dimen.player_controls_row_height_tv else R.dimen.player_controls_row_height)
+            val ms = px(if (tvMode) R.dimen.player_controls_row_margin_start_tv else R.dimen.player_controls_row_margin_start)
+            val me = px(if (tvMode) R.dimen.player_controls_row_margin_end_tv else R.dimen.player_controls_row_margin_end)
+            if (lp.height != height || lp.marginStart != ms || lp.marginEnd != me) {
+                lp.height = height
+                lp.marginStart = ms
+                lp.marginEnd = me
+                binding.controlsRow.layoutParams = lp
+            }
+        }
+
+        val controlSize = px(if (tvMode) R.dimen.player_control_button_size_tv else R.dimen.player_control_button_size)
+        val controlPad = px(if (tvMode) R.dimen.player_control_button_padding_tv else R.dimen.player_control_button_padding)
+        listOf(
+            binding.btnPlayPause,
+            binding.btnRew,
+            binding.btnFfwd,
+            binding.btnSubtitle,
+            binding.btnDanmaku,
+            binding.btnAdvanced,
+        ).forEach { btn ->
+            setSize(btn, controlSize, controlSize)
+            btn.setPadding(controlPad, controlPad, controlPad, controlPad)
+        }
+
+        binding.tvTime.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) R.dimen.player_time_text_size_tv else R.dimen.player_time_text_size),
+        )
+        (binding.tvTime.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val me = px(if (tvMode) R.dimen.player_time_margin_end_tv else R.dimen.player_time_margin_end)
+            if (lp.marginEnd != me) {
+                lp.marginEnd = me
+                binding.tvTime.layoutParams = lp
+            }
+        }
+
+        binding.tvSeekHint.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            pxF(if (tvMode) R.dimen.player_seek_hint_text_size_tv else R.dimen.player_seek_hint_text_size),
+        )
+        val hintPadH = px(if (tvMode) R.dimen.player_seek_hint_padding_h_tv else R.dimen.player_seek_hint_padding_h)
+        val hintPadV = px(if (tvMode) R.dimen.player_seek_hint_padding_v_tv else R.dimen.player_seek_hint_padding_v)
+        if (
+            binding.tvSeekHint.paddingLeft != hintPadH ||
+            binding.tvSeekHint.paddingRight != hintPadH ||
+            binding.tvSeekHint.paddingTop != hintPadV ||
+            binding.tvSeekHint.paddingBottom != hintPadV
+        ) {
+            binding.tvSeekHint.setPadding(hintPadH, hintPadV, hintPadH, hintPadV)
+        }
+        (binding.tvSeekHint.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val ms = px(if (tvMode) R.dimen.player_seek_hint_margin_start_tv else R.dimen.player_seek_hint_margin_start)
+            val mb = px(if (tvMode) R.dimen.player_seek_hint_margin_bottom_tv else R.dimen.player_seek_hint_margin_bottom)
+            if (lp.marginStart != ms || lp.bottomMargin != mb) {
+                lp.marginStart = ms
+                lp.bottomMargin = mb
+                binding.tvSeekHint.layoutParams = lp
+            }
+        }
+    }
+
+    private fun setSize(view: View, widthPx: Int, heightPx: Int) {
+        val lp = view.layoutParams ?: return
+        if (lp.width == widthPx && lp.height == heightPx) return
+        lp.width = widthPx
+        lp.height = heightPx
+        view.layoutParams = lp
     }
 
     companion object {

@@ -87,6 +87,13 @@ class DynamicFragment : Fragment() {
                                 val itemView = binding.recyclerDynamic.findContainingItemView(v) ?: return@setOnKeyListener false
                                 val next = FocusFinder.getInstance().findNextFocus(binding.recyclerDynamic, itemView, View.FOCUS_DOWN)
                                 if (next == null || !isDescendantOf(next, binding.recyclerDynamic)) {
+                                    if (binding.recyclerDynamic.canScrollVertically(1)) {
+                                        // Focus-search failed but the list can still scroll; scroll a bit to let
+                                        // RecyclerView lay out the next row, and keep focus inside the list.
+                                        val dy = (itemView.height * 0.8f).toInt().coerceAtLeast(1)
+                                        binding.recyclerDynamic.scrollBy(0, dy)
+                                        return@setOnKeyListener true
+                                    }
                                     loadMoreFeed()
                                     return@setOnKeyListener true
                                 }

@@ -21,6 +21,7 @@ object BiliClient {
     private const val TAG = "BiliClient"
     private const val BASE = "https://api.bilibili.com"
     private const val HDR_SKIP_ORIGIN = "X-Blbl-Skip-Origin"
+    private const val LOG_HTTP_REQUESTS = false
 
     lateinit var prefs: AppPrefs
         private set
@@ -61,7 +62,9 @@ object BiliClient {
                 val start = System.nanoTime()
                 val res = chain.proceed(req)
                 val costMs = (System.nanoTime() - start) / 1_000_000
-                AppLog.d(TAG, "${req.method} ${req.url.host}${req.url.encodedPath} -> ${res.code} (${costMs}ms)")
+                if (LOG_HTTP_REQUESTS) {
+                    AppLog.d(TAG, "${req.method} ${req.url.host}${req.url.encodedPath} -> ${res.code} (${costMs}ms)")
+                }
                 res
             }
             .build()
@@ -80,7 +83,9 @@ object BiliClient {
                 val start = System.nanoTime()
                 val res = chain.proceed(req)
                 val costMs = (System.nanoTime() - start) / 1_000_000
-                AppLog.d(TAG, "CDN ${req.method} ${req.url.host}${req.url.encodedPath} -> ${res.code} (${costMs}ms)")
+                if (LOG_HTTP_REQUESTS) {
+                    AppLog.d(TAG, "CDN ${req.method} ${req.url.host}${req.url.encodedPath} -> ${res.code} (${costMs}ms)")
+                }
                 res
             }
             .build()
@@ -143,8 +148,15 @@ object BiliClient {
         for ((k, v) in headers) reqBuilder.header(k, v)
         val res = clientFor(url, noCookies = noCookies).newCall(reqBuilder.build()).await()
         res.use { r ->
-            if (!r.isSuccessful) throw IOException("HTTP ${r.code} ${r.message}")
-            return withContext(Dispatchers.IO) { r.body?.bytes() ?: ByteArray(0) }
+            val bytes = withContext(Dispatchers.IO) { r.body?.bytes() ?: ByteArray(0) }
+            if (!r.isSuccessful) {
+                // Some networks/proxies may return unexpected non-2xx (e.g. 304) while still
+                // attaching a body; prefer using the body when available to avoid breaking flows
+                // like danmaku segment parsing.
+                if (bytes.isNotEmpty()) return bytes
+                throw IOException("HTTP ${r.code} ${r.message}")
+            }
+            return bytes
         }
     }
 
