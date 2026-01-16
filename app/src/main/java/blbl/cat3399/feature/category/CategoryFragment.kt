@@ -15,8 +15,9 @@ import blbl.cat3399.core.ui.enableDpadTabFocus
 import blbl.cat3399.databinding.FragmentCategoryBinding
 import blbl.cat3399.feature.video.VideoGridFragment
 import blbl.cat3399.feature.video.VideoGridTabSwitchFocusHost
+import blbl.cat3399.ui.BackPressHandler
 
-class CategoryFragment : Fragment(), VideoGridTabSwitchFocusHost {
+class CategoryFragment : Fragment(), VideoGridTabSwitchFocusHost, BackPressHandler {
     private var _binding: FragmentCategoryBinding? = null
     private val binding get() = _binding!!
     private var pageCallback: androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback? = null
@@ -121,6 +122,14 @@ class CategoryFragment : Fragment(), VideoGridTabSwitchFocusHost {
         if (focusCurrentPageFirstCardFromContentSwitch()) {
             pendingFocusFirstCardFromContentSwitch = false
         }
+        return true
+    }
+
+    override fun handleBackPressed(): Boolean {
+        val b = _binding ?: return false
+        if (b.viewPager.currentItem == 0) return false
+        pendingFocusFirstCardFromContentSwitch = true
+        b.viewPager.setCurrentItem(0, true)
         return true
     }
 

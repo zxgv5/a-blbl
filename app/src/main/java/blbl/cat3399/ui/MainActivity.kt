@@ -3,7 +3,6 @@ package blbl.cat3399.ui
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
-import android.content.DialogInterface
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -12,8 +11,8 @@ import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -50,11 +49,11 @@ class MainActivity : AppCompatActivity() {
     private var pausedFocusedView: WeakReference<View>? = null
     private var pausedFocusWasInMain: Boolean = false
     private var focusListener: ViewTreeObserver.OnGlobalFocusChangeListener? = null
-    private var exitDialog: AlertDialog? = null
     private var disclaimerDialog: AlertDialog? = null
     private lateinit var userInfoOverlay: DialogUserInfoBinding
     private var userInfoPrevFocus: WeakReference<View>? = null
     private var userInfoLoadJob: Job? = null
+    private var lastBackAtMs: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,7 +132,7 @@ class MainActivity : AppCompatActivity() {
                         navAdapter.select(SidebarNavAdapter.ID_HOME, trigger = true)
                         return
                     }
-                    showExitConfirm()
+                    if (shouldFinishOnBackPress()) finish()
                 }
             },
         )
@@ -393,21 +392,13 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(this, QrLoginActivity::class.java))
     }
 
-    private fun showExitConfirm() {
-        if (exitDialog?.isShowing == true) return
-        val dialog =
-            MaterialAlertDialogBuilder(this)
-                .setTitle("退出")
-                .setMessage("确定要退出吗？")
-                .setNegativeButton("否", null)
-                .setPositiveButton("退出") { _, _ -> finish() }
-                .create()
-        dialog.setOnDismissListener { exitDialog = null }
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_NEGATIVE)?.requestFocus()
-        }
-        dialog.show()
-        exitDialog = dialog
+    private fun shouldFinishOnBackPress(): Boolean {
+        val now = SystemClock.uptimeMillis()
+        val isSecond = now - lastBackAtMs <= BACK_DOUBLE_PRESS_WINDOW_MS
+        if (isSecond) return true
+        lastBackAtMs = now
+        Toast.makeText(this, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+        return false
     }
 
     private fun showFirstLaunchDisclaimerIfNeeded() {
@@ -429,7 +420,7 @@ class MainActivity : AppCompatActivity() {
             if (!BiliClient.prefs.disclaimerAccepted && !isChangingConfigurations) finish()
         }
         dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.requestFocus()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
         }
         dialog.show()
         disclaimerDialog = dialog
@@ -855,5 +846,9 @@ class MainActivity : AppCompatActivity() {
 
             else -> false
         }
+    }
+
+    companion object {
+        private const val BACK_DOUBLE_PRESS_WINDOW_MS = 1_500L
     }
 }

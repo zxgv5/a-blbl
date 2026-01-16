@@ -39,7 +39,9 @@ class MyFragment : Fragment(), BackPressHandler, MyNavigator {
     }
 
     override fun handleBackPressed(): Boolean {
-        return childFragmentManager.popBackStackImmediate()
+        if (childFragmentManager.popBackStackImmediate()) return true
+        val current = childFragmentManager.findFragmentById(R.id.my_container)
+        return (current as? BackPressHandler)?.handleBackPressed() == true
     }
 
     override fun openFavFolder(mediaId: Long, title: String) {

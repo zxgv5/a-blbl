@@ -13,9 +13,10 @@ import blbl.cat3399.R
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.ui.enableDpadTabFocus
 import blbl.cat3399.databinding.FragmentMyTabsBinding
+import blbl.cat3399.ui.BackPressHandler
 import com.google.android.material.tabs.TabLayoutMediator
 
-class MyTabsFragment : Fragment(), MyTabContentSwitchFocusHost {
+class MyTabsFragment : Fragment(), MyTabContentSwitchFocusHost, BackPressHandler {
     private var _binding: FragmentMyTabsBinding? = null
     private val binding get() = _binding!!
 
@@ -126,6 +127,14 @@ class MyTabsFragment : Fragment(), MyTabContentSwitchFocusHost {
         if (focusCurrentPageFirstItemFromContentSwitch()) {
             pendingFocusFirstItemFromContentSwitch = false
         }
+        return true
+    }
+
+    override fun handleBackPressed(): Boolean {
+        val b = _binding ?: return false
+        if (b.viewPager.currentItem == 0) return false
+        pendingFocusFirstItemFromContentSwitch = true
+        b.viewPager.setCurrentItem(0, true)
         return true
     }
 

@@ -15,11 +15,12 @@ import blbl.cat3399.core.model.LiveAreaParent
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.ui.enableDpadTabFocus
 import blbl.cat3399.databinding.FragmentLiveBinding
+import blbl.cat3399.ui.BackPressHandler
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class LiveFragment : Fragment(), LiveGridTabSwitchFocusHost {
+class LiveFragment : Fragment(), LiveGridTabSwitchFocusHost, BackPressHandler {
     private var _binding: FragmentLiveBinding? = null
     private val binding get() = _binding!!
 
@@ -145,6 +146,14 @@ class LiveFragment : Fragment(), LiveGridTabSwitchFocusHost {
         if (focusCurrentPageFirstCardFromContentSwitch()) {
             pendingFocusFirstCardFromContentSwitch = false
         }
+        return true
+    }
+
+    override fun handleBackPressed(): Boolean {
+        val b = _binding ?: return false
+        if (b.viewPager.currentItem == 0) return false
+        pendingFocusFirstCardFromContentSwitch = true
+        b.viewPager.setCurrentItem(0, true)
         return true
     }
 
