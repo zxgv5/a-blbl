@@ -334,7 +334,7 @@ class SettingsActivity : AppCompatActivity() {
             }
 
             "弹幕字体大小" -> {
-                val options = listOf(14, 16, 18, 20, 24, 28, 32, 36, 40)
+                val options = listOf(14, 16, 18, 20, 22, 24, 28, 32, 36, 40)
                 showChoiceDialog(
                     title = "弹幕字体大小(sp)",
                     items = options.map { it.toString() },

@@ -1323,7 +1323,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showDanmakuTextSizeDialog() {
-        val options = listOf(14, 16, 18, 20, 24, 28, 32, 36, 40)
+        val options = listOf(14, 16, 18, 20, 22, 24, 28, 32, 36, 40)
         val items = options.map { it.toString() }.toTypedArray()
         val current = options.indexOf(session.danmaku.textSizeSp.toInt()).let { if (it >= 0) it else 2 }
         MaterialAlertDialogBuilder(this)
