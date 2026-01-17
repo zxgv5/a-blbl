@@ -99,6 +99,10 @@ class MyToViewFragment : Fragment(), MyTabSwitchFocusTarget {
                                         // RecyclerView lay out the next row, and keep focus inside the list.
                                         val dy = (itemView.height * 0.8f).toInt().coerceAtLeast(1)
                                         binding.recycler.scrollBy(0, dy)
+                                        binding.recycler.post {
+                                            if (_binding == null) return@post
+                                            tryFocusNextDownFromCurrent()
+                                        }
                                         return@setOnKeyListener true
                                     }
                                     return@setOnKeyListener true
@@ -203,5 +207,18 @@ class MyToViewFragment : Fragment(), MyTabSwitchFocusTarget {
         initialLoadTriggered = false
         _binding = null
         super.onDestroyView()
+    }
+
+    private fun tryFocusNextDownFromCurrent() {
+        val b = _binding ?: return
+        if (!isResumed) return
+        val recycler = b.recycler
+        val focused = activity?.currentFocus ?: return
+        if (!isDescendantOf(focused, recycler)) return
+        val itemView = recycler.findContainingItemView(focused) ?: return
+        val next = FocusFinder.getInstance().findNextFocus(recycler, itemView, View.FOCUS_DOWN)
+        if (next != null && isDescendantOf(next, recycler)) {
+            next.requestFocus()
+        }
     }
 }

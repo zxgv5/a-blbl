@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import blbl.cat3399.R
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.databinding.ItemSidebarNavBinding
+import kotlin.math.roundToInt
 
 class SidebarNavAdapter(
     private val onClick: (NavItem) -> Boolean,
@@ -23,6 +24,8 @@ class SidebarNavAdapter(
 
     private val items = ArrayList<NavItem>()
     private var selectedId: Int = ID_HOME
+    private var tvMode: Boolean = false
+    private var sidebarScale: Float = 1.0f
     private var showLabelsAlways: Boolean = false
 
     fun submit(list: List<NavItem>, selectedId: Int) {
@@ -35,6 +38,19 @@ class SidebarNavAdapter(
     fun setShowLabelsAlways(enabled: Boolean) {
         if (showLabelsAlways == enabled) return
         showLabelsAlways = enabled
+        notifyDataSetChanged()
+    }
+
+    fun setTvMode(enabled: Boolean) {
+        if (tvMode == enabled) return
+        tvMode = enabled
+        notifyDataSetChanged()
+    }
+
+    fun setSidebarScale(scale: Float) {
+        val value = scale.coerceIn(0.75f, 1.35f)
+        if (sidebarScale == value) return
+        sidebarScale = value
         notifyDataSetChanged()
     }
 
@@ -70,9 +86,9 @@ class SidebarNavAdapter(
         val selected = item.id == selectedId
         AppLog.d(
             "Nav",
-            "bind pos=$position id=${item.id} selected=$selected labels=$showLabelsAlways t=${SystemClock.uptimeMillis()}",
+            "bind pos=$position id=${item.id} selected=$selected labels=$showLabelsAlways tv=$tvMode scale=$sidebarScale t=${SystemClock.uptimeMillis()}",
         )
-        holder.bind(item, selected, showLabelsAlways) {
+        holder.bind(item, selected, tvMode, sidebarScale, showLabelsAlways) {
             val handled = onClick(item)
             if (handled) select(item.id, trigger = false)
         }
@@ -81,9 +97,16 @@ class SidebarNavAdapter(
     override fun getItemCount(): Int = items.size
 
     class Vh(private val binding: ItemSidebarNavBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: NavItem, selected: Boolean, showLabelsAlways: Boolean, onClick: () -> Unit) {
-            val tvSizing = showLabelsAlways
-            applySizing(tvSizing)
+        fun bind(
+            item: NavItem,
+            selected: Boolean,
+            tvMode: Boolean,
+            sidebarScale: Float,
+            showLabelsAlways: Boolean,
+            onClick: () -> Unit,
+        ) {
+            val scale = sidebarScale.coerceIn(0.75f, 1.35f)
+            applySizing(tvMode, scale)
 
             binding.ivIcon.setImageResource(item.iconRes)
             binding.tvLabel.text = item.title
@@ -96,29 +119,31 @@ class SidebarNavAdapter(
             binding.ivIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, iconTint))
 
             val heightPx =
-                binding.root.resources.getDimensionPixelSize(
+                (binding.root.resources.getDimensionPixelSize(
                     when {
                         showLabelsAlways ->
-                            if (tvSizing) R.dimen.sidebar_nav_item_height_labeled_tv else R.dimen.sidebar_nav_item_height_labeled
+                            if (tvMode) R.dimen.sidebar_nav_item_height_labeled_tv else R.dimen.sidebar_nav_item_height_labeled
 
                         selected ->
-                            if (tvSizing) R.dimen.sidebar_nav_item_height_selected_tv else R.dimen.sidebar_nav_item_height_selected
+                            if (tvMode) R.dimen.sidebar_nav_item_height_selected_tv else R.dimen.sidebar_nav_item_height_selected
 
                         else ->
-                            if (tvSizing) R.dimen.sidebar_nav_item_height_default_tv else R.dimen.sidebar_nav_item_height_default
+                            if (tvMode) R.dimen.sidebar_nav_item_height_default_tv else R.dimen.sidebar_nav_item_height_default
                     },
-                )
+                ) * scale).roundToInt().coerceAtLeast(1)
             val lp = binding.card.layoutParams
             lp.height = heightPx
             binding.card.layoutParams = lp
             binding.root.setOnClickListener { onClick() }
         }
 
-        private fun applySizing(tvSizing: Boolean) {
+        private fun applySizing(tvMode: Boolean, scale: Float) {
             fun px(id: Int): Int = binding.root.resources.getDimensionPixelSize(id)
             fun pxF(id: Int): Float = binding.root.resources.getDimension(id)
+            fun scaledPx(id: Int): Int = (px(id) * scale).roundToInt()
+            fun scaledPxF(id: Int): Float = pxF(id) * scale
 
-            val iconSize = px(if (tvSizing) R.dimen.sidebar_nav_icon_size_tv else R.dimen.sidebar_nav_icon_size)
+            val iconSize = scaledPx(if (tvMode) R.dimen.sidebar_nav_icon_size_tv else R.dimen.sidebar_nav_icon_size)
             val iconLp = binding.ivIcon.layoutParams
             if (iconLp.width != iconSize || iconLp.height != iconSize) {
                 iconLp.width = iconSize
@@ -128,18 +153,18 @@ class SidebarNavAdapter(
 
             binding.tvLabel.setTextSize(
                 TypedValue.COMPLEX_UNIT_PX,
-                pxF(if (tvSizing) R.dimen.sidebar_nav_label_text_size_tv else R.dimen.sidebar_nav_label_text_size),
+                scaledPxF(if (tvMode) R.dimen.sidebar_nav_label_text_size_tv else R.dimen.sidebar_nav_label_text_size),
             )
 
             (binding.tvLabel.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
-                val mt = px(if (tvSizing) R.dimen.sidebar_nav_label_margin_top_tv else R.dimen.sidebar_nav_label_margin_top)
+                val mt = scaledPx(if (tvMode) R.dimen.sidebar_nav_label_margin_top_tv else R.dimen.sidebar_nav_label_margin_top)
                 if (lp.topMargin != mt) {
                     lp.topMargin = mt
                     binding.tvLabel.layoutParams = lp
                 }
             }
 
-            val padV = px(if (tvSizing) R.dimen.sidebar_nav_container_padding_v_tv else R.dimen.sidebar_nav_container_padding_v)
+            val padV = scaledPx(if (tvMode) R.dimen.sidebar_nav_container_padding_v_tv else R.dimen.sidebar_nav_container_padding_v)
             if (binding.container.paddingTop != padV || binding.container.paddingBottom != padV) {
                 binding.container.setPadding(
                     binding.container.paddingLeft,
@@ -150,8 +175,8 @@ class SidebarNavAdapter(
             }
 
             (binding.card.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
-                val mv = px(if (tvSizing) R.dimen.sidebar_nav_card_margin_v_tv else R.dimen.sidebar_nav_card_margin_v)
-                val mh = px(if (tvSizing) R.dimen.sidebar_nav_card_margin_h_tv else R.dimen.sidebar_nav_card_margin_h)
+                val mv = scaledPx(if (tvMode) R.dimen.sidebar_nav_card_margin_v_tv else R.dimen.sidebar_nav_card_margin_v)
+                val mh = scaledPx(if (tvMode) R.dimen.sidebar_nav_card_margin_h_tv else R.dimen.sidebar_nav_card_margin_h)
                 if (lp.topMargin != mv || lp.bottomMargin != mv || lp.leftMargin != mh || lp.rightMargin != mh) {
                     lp.topMargin = mv
                     lp.bottomMargin = mv

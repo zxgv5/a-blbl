@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Sidebar -->
-    <dimen name="sidebar_width_normal">48dp</dimen>
-    <dimen name="sidebar_width_tv">96dp</dimen>
+    <dimen name="sidebar_width_normal">44dp</dimen>
+    <dimen name="sidebar_width_small">40dp</dimen>
+    <dimen name="sidebar_width_large">52dp</dimen>
+    <dimen name="sidebar_width_tv">90dp</dimen>
+    <dimen name="sidebar_width_tv_small">82dp</dimen>
+    <dimen name="sidebar_width_tv_large">116dp</dimen>
     <dimen name="sidebar_user_size">32dp</dimen>
     <dimen name="sidebar_user_margin_top">8dp</dimen>
     <dimen name="sidebar_login_size">40dp</dimen>
@@ -68,32 +72,32 @@
 
     <!-- Dynamic: following list -->
     <dimen name="dynamic_following_panel_width">190dp</dimen>
-    <dimen name="dynamic_following_panel_width_tv">280dp</dimen>
+    <dimen name="dynamic_following_panel_width_tv">250dp</dimen>
     <dimen name="dynamic_following_panel_margin">8dp</dimen>
-    <dimen name="dynamic_following_panel_margin_tv">10dp</dimen>
+    <dimen name="dynamic_following_panel_margin_tv">8dp</dimen>
     <dimen name="dynamic_following_list_padding">3dp</dimen>
-    <dimen name="dynamic_following_list_padding_tv">8dp</dimen>
+    <dimen name="dynamic_following_list_padding_tv">6dp</dimen>
 
     <dimen name="following_item_height">36dp</dimen>
-    <dimen name="following_item_height_tv">56dp</dimen>
+    <dimen name="following_item_height_tv">50dp</dimen>
     <dimen name="following_item_margin_v">1dp</dimen>
-    <dimen name="following_item_margin_v_tv">2dp</dimen>
+    <dimen name="following_item_margin_v_tv">1dp</dimen>
     <dimen name="following_item_margin_h">2dp</dimen>
-    <dimen name="following_item_margin_h_tv">6dp</dimen>
+    <dimen name="following_item_margin_h_tv">4dp</dimen>
     <dimen name="following_container_padding_h">6dp</dimen>
-    <dimen name="following_container_padding_h_tv">12dp</dimen>
+    <dimen name="following_container_padding_h_tv">10dp</dimen>
     <dimen name="following_selected_width">3dp</dimen>
-    <dimen name="following_selected_width_tv">4dp</dimen>
+    <dimen name="following_selected_width_tv">3dp</dimen>
     <dimen name="following_selected_height">18dp</dimen>
-    <dimen name="following_selected_height_tv">28dp</dimen>
+    <dimen name="following_selected_height_tv">24dp</dimen>
     <dimen name="following_selected_margin_end">6dp</dimen>
-    <dimen name="following_selected_margin_end_tv">10dp</dimen>
+    <dimen name="following_selected_margin_end_tv">8dp</dimen>
     <dimen name="following_avatar_size">24dp</dimen>
-    <dimen name="following_avatar_size_tv">40dp</dimen>
+    <dimen name="following_avatar_size_tv">34dp</dimen>
     <dimen name="following_name_margin_start">6dp</dimen>
-    <dimen name="following_name_margin_start_tv">10dp</dimen>
+    <dimen name="following_name_margin_start_tv">8dp</dimen>
     <dimen name="following_name_text_size">14sp</dimen>
-    <dimen name="following_name_text_size_tv">18sp</dimen>
+    <dimen name="following_name_text_size_tv">16sp</dimen>
 
     <!-- Search: history/suggest/hot list -->
     <dimen name="search_suggest_margin_bottom">10dp</dimen>

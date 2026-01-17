@@ -26,6 +26,10 @@ class AppPrefs(context: Context) {
         get() = prefs.getString(KEY_UI_MODE, UI_MODE_AUTO) ?: UI_MODE_AUTO
         set(value) = prefs.edit().putString(KEY_UI_MODE, value).apply()
 
+    var sidebarSize: String
+        get() = prefs.getString(KEY_SIDEBAR_SIZE, SIDEBAR_SIZE_MEDIUM) ?: SIDEBAR_SIZE_MEDIUM
+        set(value) = prefs.edit().putString(KEY_SIDEBAR_SIZE, value).apply()
+
     var userAgent: String
         get() = prefs.getString(KEY_UA, DEFAULT_UA) ?: DEFAULT_UA
         set(value) = prefs.edit().putString(KEY_UA, value).apply()
@@ -203,6 +207,10 @@ class AppPrefs(context: Context) {
         const val UI_MODE_TV = "tv"
         const val UI_MODE_NORMAL = "normal"
 
+        const val SIDEBAR_SIZE_SMALL = "small"
+        const val SIDEBAR_SIZE_MEDIUM = "medium"
+        const val SIDEBAR_SIZE_LARGE = "large"
+
         private const val KEY_DISCLAIMER_ACCEPTED = "disclaimer_accepted"
         private const val KEY_WEB_REFRESH_TOKEN = "web_refresh_token"
         private const val KEY_WEB_COOKIE_REFRESH_CHECKED_EPOCH_DAY = "web_cookie_refresh_checked_epoch_day"
@@ -213,6 +221,7 @@ class AppPrefs(context: Context) {
         private const val KEY_BUVID_ACTIVATED_MID = "buvid_activated_mid"
         private const val KEY_BUVID_ACTIVATED_EPOCH_DAY = "buvid_activated_epoch_day"
         private const val KEY_UI_MODE = "ui_mode"
+        private const val KEY_SIDEBAR_SIZE = "sidebar_size"
         private const val KEY_IMAGE_QUALITY = "image_quality"
         private const val KEY_DANMAKU_ENABLED = "danmaku_enabled"
         private const val KEY_DANMAKU_ALLOW_TOP = "danmaku_allow_top"

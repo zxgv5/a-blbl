@@ -39,6 +39,8 @@ class DynamicFragment : Fragment() {
     private var endReached: Boolean = false
     private var nextOffset: String? = null
     private var requestToken: Int = 0
+    private var pendingFocusNextCardAfterLoadMoreFromDpad: Boolean = false
+    private var pendingFocusNextCardAfterLoadMoreFromPos: Int = RecyclerView.NO_POSITION
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (!loggedIn) {
@@ -92,7 +94,20 @@ class DynamicFragment : Fragment() {
                                         // RecyclerView lay out the next row, and keep focus inside the list.
                                         val dy = (itemView.height * 0.8f).toInt().coerceAtLeast(1)
                                         binding.recyclerDynamic.scrollBy(0, dy)
+                                        binding.recyclerDynamic.post {
+                                            if (_binding == null) return@post
+                                            tryFocusNextDownFromCurrent()
+                                        }
                                         return@setOnKeyListener true
+                                    }
+                                    val holder = binding.recyclerDynamic.findContainingViewHolder(v)
+                                    val pos =
+                                        holder?.bindingAdapterPosition
+                                            ?.takeIf { it != RecyclerView.NO_POSITION }
+                                            ?: RecyclerView.NO_POSITION
+                                    if (pos != RecyclerView.NO_POSITION) {
+                                        pendingFocusNextCardAfterLoadMoreFromDpad = true
+                                        pendingFocusNextCardAfterLoadMoreFromPos = pos
                                     }
                                     loadMoreFeed()
                                     return@setOnKeyListener true
@@ -175,6 +190,7 @@ class DynamicFragment : Fragment() {
     }
 
     private fun resetAndLoadFeed() {
+        clearPendingFocusNextCardAfterLoadMoreFromDpad()
         loadedBvids.clear()
         nextOffset = null
         endReached = false
@@ -203,6 +219,7 @@ class DynamicFragment : Fragment() {
 
                 val filtered = page.items.filter { loadedBvids.add(it.bvid) }
                 videoAdapter.append(filtered)
+                _binding?.recyclerDynamic?.post { maybeConsumePendingFocusNextCardAfterLoadMoreFromDpad() }
             } catch (t: Throwable) {
                 AppLog.e("Dynamic", "load feed failed mid=$selectedMid", t)
                 Toast.makeText(requireContext(), "加载失败，可查看 Logcat(标签 BLBL)", Toast.LENGTH_SHORT).show()
@@ -237,8 +254,73 @@ class DynamicFragment : Fragment() {
         return false
     }
 
+    private fun clearPendingFocusNextCardAfterLoadMoreFromDpad() {
+        pendingFocusNextCardAfterLoadMoreFromDpad = false
+        pendingFocusNextCardAfterLoadMoreFromPos = RecyclerView.NO_POSITION
+    }
+
+    private fun maybeConsumePendingFocusNextCardAfterLoadMoreFromDpad(): Boolean {
+        if (!pendingFocusNextCardAfterLoadMoreFromDpad) return false
+        val binding = _binding
+        if (binding == null || !isResumed || !this::videoAdapter.isInitialized) {
+            clearPendingFocusNextCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val recycler = binding.recyclerDynamic
+        val lm = recycler.layoutManager as? GridLayoutManager
+        if (lm == null) {
+            clearPendingFocusNextCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val anchorPos = pendingFocusNextCardAfterLoadMoreFromPos
+        if (anchorPos == RecyclerView.NO_POSITION) {
+            clearPendingFocusNextCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val focused = activity?.currentFocus
+        if (focused != null && !isDescendantOf(focused, recycler)) {
+            clearPendingFocusNextCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val spanCount = lm.spanCount.coerceAtLeast(1)
+        val itemCount = videoAdapter.itemCount
+        val candidatePos =
+            when {
+                anchorPos + spanCount in 0 until itemCount -> anchorPos + spanCount
+                anchorPos + 1 in 0 until itemCount -> anchorPos + 1
+                else -> null
+            }
+        clearPendingFocusNextCardAfterLoadMoreFromDpad()
+        if (candidatePos == null) return false
+
+        recycler.findViewHolderForAdapterPosition(candidatePos)?.itemView?.requestFocus()
+            ?: run {
+                recycler.scrollToPosition(candidatePos)
+                recycler.post { recycler.findViewHolderForAdapterPosition(candidatePos)?.itemView?.requestFocus() }
+            }
+        return true
+    }
+
+    private fun tryFocusNextDownFromCurrent() {
+        val binding = _binding ?: return
+        if (!isResumed) return
+        val recycler = binding.recyclerDynamic
+        val focused = activity?.currentFocus ?: return
+        if (!isDescendantOf(focused, recycler)) return
+        val itemView = recycler.findContainingItemView(focused) ?: return
+        val next = FocusFinder.getInstance().findNextFocus(recycler, itemView, View.FOCUS_DOWN)
+        if (next != null && isDescendantOf(next, recycler)) {
+            next.requestFocus()
+        }
+    }
+
     override fun onDestroyView() {
         _bindingLogin = null
+        clearPendingFocusNextCardAfterLoadMoreFromDpad()
         _binding = null
         super.onDestroyView()
     }

@@ -57,6 +57,8 @@ class SearchFragment : Fragment(), BackPressHandler {
     private var currentTabIndex: Int = 0
     private var currentOrder: Order = Order.TotalRank
     private var pendingFocusFirstResultCardFromTabSwitch: Boolean = false
+    private var pendingFocusNextResultCardAfterLoadMoreFromDpad: Boolean = false
+    private var pendingFocusNextResultCardAfterLoadMoreFromPos: Int = RecyclerView.NO_POSITION
 
     private val loadedBvids = HashSet<String>()
     private var isLoadingMore: Boolean = false
@@ -441,12 +443,20 @@ class SearchFragment : Fragment(), BackPressHandler {
 	                                        // RecyclerView lay out the next row, and keep focus inside the list.
 	                                        val dy = (itemView.height * 0.8f).toInt().coerceAtLeast(1)
 	                                        binding.recyclerResults.scrollBy(0, dy)
+	                                        binding.recyclerResults.post {
+	                                            if (_binding == null) return@post
+	                                            tryFocusNextDownFromCurrentResult()
+	                                        }
 	                                        return@setOnKeyListener true
 	                                    }
 
 	                                    // Bottom edge: keep focus inside the list (avoid escaping to sidebar) and
 	                                    // trigger loading more if possible.
-	                                    if (!endReached) loadNextPage()
+	                                    if (!endReached) {
+	                                        pendingFocusNextResultCardAfterLoadMoreFromDpad = true
+	                                        pendingFocusNextResultCardAfterLoadMoreFromPos = pos
+	                                        loadNextPage()
+	                                    }
 	                                    return@setOnKeyListener true
 	                                }
 	                                false
@@ -899,10 +909,13 @@ class SearchFragment : Fragment(), BackPressHandler {
                     return@launch
                 }
 
-                val filtered = list.filter { loadedBvids.add(it.bvid) }
-                if (page == 1) resultAdapter.submit(filtered) else resultAdapter.append(filtered)
-                _binding?.recyclerResults?.post { maybeConsumePendingFocusFirstResultCardFromTabSwitch() }
-                page++
+	                val filtered = list.filter { loadedBvids.add(it.bvid) }
+	                if (page == 1) resultAdapter.submit(filtered) else resultAdapter.append(filtered)
+	                _binding?.recyclerResults?.post {
+	                    maybeConsumePendingFocusFirstResultCardFromTabSwitch()
+	                    maybeConsumePendingFocusNextResultCardAfterLoadMoreFromDpad()
+	                }
+	                page++
 
                 if (res.pages in 1..page && page > res.pages) endReached = true
                 if (filtered.isEmpty()) endReached = true
@@ -914,7 +927,71 @@ class SearchFragment : Fragment(), BackPressHandler {
             } finally {
                 if (isRefresh && token == requestToken) _binding?.swipeRefresh?.isRefreshing = false
                 isLoadingMore = false
+	            }
+	        }
+	    }
+
+    private fun clearPendingFocusNextResultCardAfterLoadMoreFromDpad() {
+        pendingFocusNextResultCardAfterLoadMoreFromDpad = false
+        pendingFocusNextResultCardAfterLoadMoreFromPos = RecyclerView.NO_POSITION
+    }
+
+    private fun maybeConsumePendingFocusNextResultCardAfterLoadMoreFromDpad(): Boolean {
+        if (!pendingFocusNextResultCardAfterLoadMoreFromDpad) return false
+        val b = _binding
+        if (b == null || !isResumed || !this::resultAdapter.isInitialized) {
+            clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val recycler = b.recyclerResults
+        val lm = recycler.layoutManager as? GridLayoutManager
+        if (lm == null) {
+            clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val anchorPos = pendingFocusNextResultCardAfterLoadMoreFromPos
+        if (anchorPos == RecyclerView.NO_POSITION) {
+            clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val focused = activity?.currentFocus
+        if (focused != null && !isDescendantOf(focused, recycler)) {
+            clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
+            return false
+        }
+
+        val spanCount = lm.spanCount.coerceAtLeast(1)
+        val itemCount = resultAdapter.itemCount
+        val candidatePos =
+            when {
+                anchorPos + spanCount in 0 until itemCount -> anchorPos + spanCount
+                anchorPos + 1 in 0 until itemCount -> anchorPos + 1
+                else -> null
             }
+        clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
+        if (candidatePos == null) return false
+
+        recycler.findViewHolderForAdapterPosition(candidatePos)?.itemView?.requestFocus()
+            ?: run {
+                recycler.scrollToPosition(candidatePos)
+                recycler.post { recycler.findViewHolderForAdapterPosition(candidatePos)?.itemView?.requestFocus() }
+            }
+        return true
+    }
+
+    private fun tryFocusNextDownFromCurrentResult() {
+        val b = _binding ?: return
+        if (!isResumed) return
+        val recycler = b.recyclerResults
+        val focused = activity?.currentFocus ?: return
+        if (!isDescendantOf(focused, recycler)) return
+        val itemView = recycler.findContainingItemView(focused) ?: return
+        val next = FocusFinder.getInstance().findNextFocus(recycler, itemView, View.FOCUS_DOWN)
+        if (next != null && isDescendantOf(next, recycler)) {
+            next.requestFocus()
         }
     }
 
@@ -969,6 +1046,7 @@ class SearchFragment : Fragment(), BackPressHandler {
     override fun onDestroyView() {
         suggestJob?.cancel()
         suggestJob = null
+        clearPendingFocusNextResultCardAfterLoadMoreFromDpad()
         _binding = null
         super.onDestroyView()
     }

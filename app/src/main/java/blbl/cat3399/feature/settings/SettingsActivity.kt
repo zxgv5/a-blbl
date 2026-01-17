@@ -202,6 +202,7 @@ class SettingsActivity : AppCompatActivity() {
             "页面设置" -> listOf(
                 SettingEntry("每行卡片数量", gridSpanText(prefs.gridSpanCount), "影响推荐/热门/分类（动态单独设置）"),
                 SettingEntry("动态页每行卡片数量", gridSpanText(prefs.dynamicGridSpanCount), "默认 3"),
+                SettingEntry("侧边栏大小", sidebarSizeText(prefs.sidebarSize), "同时调整宽度/按钮尺寸（TV/非TV）"),
                 SettingEntry("TV 模式", tvModeText(prefs.uiMode), "优化遥控器/键盘导航与焦点样式"),
                 SettingEntry("以全屏模式运行", if (prefs.fullscreenEnabled) "开" else "关", "隐藏状态栏/导航栏"),
             )
@@ -303,6 +304,24 @@ class SettingsActivity : AppCompatActivity() {
                         }
                     Toast.makeText(this, "TV 模式：$selected", Toast.LENGTH_SHORT).show()
                     recreate()
+                }
+            }
+
+            "侧边栏大小" -> {
+                val options = listOf("小", "中", "大")
+                showChoiceDialog(
+                    title = "侧边栏大小",
+                    items = options,
+                    current = sidebarSizeText(prefs.sidebarSize),
+                ) { selected ->
+                    prefs.sidebarSize =
+                        when (selected) {
+                            "小" -> blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_SMALL
+                            "大" -> blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_LARGE
+                            else -> blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_MEDIUM
+                        }
+                    Toast.makeText(this, "侧边栏大小：$selected", Toast.LENGTH_SHORT).show()
+                    refreshSection(entry.title)
                 }
             }
 
@@ -925,6 +944,12 @@ class SettingsActivity : AppCompatActivity() {
         blbl.cat3399.core.prefs.AppPrefs.UI_MODE_TV -> "开"
         blbl.cat3399.core.prefs.AppPrefs.UI_MODE_NORMAL -> "关"
         else -> "自动"
+    }
+
+    private fun sidebarSizeText(prefValue: String): String = when (prefValue) {
+        blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_SMALL -> "小"
+        blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_LARGE -> "大"
+        else -> "中"
     }
 
     private fun cdnText(code: String): String = when (code) {

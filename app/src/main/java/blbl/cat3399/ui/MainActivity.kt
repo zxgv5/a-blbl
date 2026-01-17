@@ -22,6 +22,7 @@ import blbl.cat3399.R
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.net.BiliClient
+import blbl.cat3399.core.prefs.AppPrefs
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
 import blbl.cat3399.databinding.ActivityMainBinding
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.Locale
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -465,11 +467,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyUiMode() {
         val tvMode = TvMode.isEnabled(this)
-        if (::navAdapter.isInitialized) navAdapter.setShowLabelsAlways(tvMode)
+        val sidebarScale = sidebarScaleFor(BiliClient.prefs.sidebarSize)
+        if (::navAdapter.isInitialized) {
+            navAdapter.setTvMode(tvMode)
+            navAdapter.setSidebarScale(sidebarScale)
+        }
 
         val widthPx =
             resources.getDimensionPixelSize(
-                if (tvMode) R.dimen.sidebar_width_tv else R.dimen.sidebar_width_normal,
+                sidebarWidthDimenFor(tvMode, BiliClient.prefs.sidebarSize),
             )
         val lp = binding.sidebar.layoutParams
         if (lp.width != widthPx) {
@@ -477,34 +483,37 @@ class MainActivity : AppCompatActivity() {
             binding.sidebar.layoutParams = lp
         }
 
-        applySidebarSizing(tvMode)
+        applySidebarSizing(tvMode, sidebarScale)
     }
 
-    private fun applySidebarSizing(tvMode: Boolean) {
+    private fun applySidebarSizing(tvMode: Boolean, sidebarScale: Float) {
         fun px(id: Int): Int = resources.getDimensionPixelSize(id)
         fun pxF(id: Int): Float = resources.getDimension(id)
+        val scale = sidebarScale.coerceIn(0.75f, 1.35f)
+        fun scaledPx(id: Int): Int = (px(id) * scale).roundToInt()
+        fun scaledPxF(id: Int): Float = pxF(id) * scale
 
-        val userSize = px(if (tvMode) R.dimen.sidebar_user_size_tv else R.dimen.sidebar_user_size)
+        val userSize = scaledPx(if (tvMode) R.dimen.sidebar_user_size_tv else R.dimen.sidebar_user_size)
         setSize(binding.ivSidebarUser, userSize, userSize)
-        setTopMargin(binding.ivSidebarUser, px(if (tvMode) R.dimen.sidebar_user_margin_top_tv else R.dimen.sidebar_user_margin_top))
+        setTopMargin(binding.ivSidebarUser, scaledPx(if (tvMode) R.dimen.sidebar_user_margin_top_tv else R.dimen.sidebar_user_margin_top))
 
-        val loginSize = px(if (tvMode) R.dimen.sidebar_login_size_tv else R.dimen.sidebar_login_size)
+        val loginSize = scaledPx(if (tvMode) R.dimen.sidebar_login_size_tv else R.dimen.sidebar_login_size)
         setSize(binding.btnSidebarLogin, loginSize, loginSize)
-        setTopMargin(binding.btnSidebarLogin, px(if (tvMode) R.dimen.sidebar_login_margin_top_tv else R.dimen.sidebar_login_margin_top))
+        setTopMargin(binding.btnSidebarLogin, scaledPx(if (tvMode) R.dimen.sidebar_login_margin_top_tv else R.dimen.sidebar_login_margin_top))
         binding.btnSidebarLogin.setTextSize(
             android.util.TypedValue.COMPLEX_UNIT_PX,
-            pxF(if (tvMode) R.dimen.sidebar_login_text_size_tv else R.dimen.sidebar_login_text_size),
+            scaledPxF(if (tvMode) R.dimen.sidebar_login_text_size_tv else R.dimen.sidebar_login_text_size),
         )
 
-        setTopMargin(binding.recyclerSidebar, px(if (tvMode) R.dimen.sidebar_nav_margin_top_tv else R.dimen.sidebar_nav_margin_top))
+        setTopMargin(binding.recyclerSidebar, scaledPx(if (tvMode) R.dimen.sidebar_nav_margin_top_tv else R.dimen.sidebar_nav_margin_top))
 
-        val settingsSize = px(if (tvMode) R.dimen.sidebar_settings_size_tv else R.dimen.sidebar_settings_size)
+        val settingsSize = scaledPx(if (tvMode) R.dimen.sidebar_settings_size_tv else R.dimen.sidebar_settings_size)
         setSize(binding.btnSidebarSettings, settingsSize, settingsSize)
         setBottomMargin(
             binding.btnSidebarSettings,
-            px(if (tvMode) R.dimen.sidebar_settings_margin_bottom_tv else R.dimen.sidebar_settings_margin_bottom),
+            scaledPx(if (tvMode) R.dimen.sidebar_settings_margin_bottom_tv else R.dimen.sidebar_settings_margin_bottom),
         )
-        val settingsPadding = px(if (tvMode) R.dimen.sidebar_settings_padding_tv else R.dimen.sidebar_settings_padding)
+        val settingsPadding = scaledPx(if (tvMode) R.dimen.sidebar_settings_padding_tv else R.dimen.sidebar_settings_padding)
         binding.btnSidebarSettings.setPadding(settingsPadding, settingsPadding, settingsPadding, settingsPadding)
     }
 
@@ -596,6 +605,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isInSidebar(view: View): Boolean = isDescendantOf(view, binding.sidebar)
+
+    private fun sidebarScaleFor(prefValue: String): Float {
+        return when (prefValue) {
+            AppPrefs.SIDEBAR_SIZE_SMALL -> 0.90f
+            AppPrefs.SIDEBAR_SIZE_LARGE -> 1.20f
+            else -> 1.00f
+        }
+    }
+
+    private fun sidebarWidthDimenFor(tvMode: Boolean, prefValue: String): Int {
+        if (tvMode) {
+            return when (prefValue) {
+                AppPrefs.SIDEBAR_SIZE_SMALL -> R.dimen.sidebar_width_tv_small
+                AppPrefs.SIDEBAR_SIZE_LARGE -> R.dimen.sidebar_width_tv_large
+                else -> R.dimen.sidebar_width_tv
+            }
+        }
+        return when (prefValue) {
+            AppPrefs.SIDEBAR_SIZE_SMALL -> R.dimen.sidebar_width_small
+            AppPrefs.SIDEBAR_SIZE_LARGE -> R.dimen.sidebar_width_large
+            else -> R.dimen.sidebar_width_normal
+        }
+    }
 
     private fun isInMainContainer(view: View): Boolean = isDescendantOf(view, binding.mainContainer)
 
