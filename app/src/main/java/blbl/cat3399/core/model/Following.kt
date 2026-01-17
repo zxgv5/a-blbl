@@ -4,5 +4,5 @@ data class Following(
     val mid: Long,
     val name: String,
     val avatarUrl: String?,
+    val sign: String? = null,
 )
-

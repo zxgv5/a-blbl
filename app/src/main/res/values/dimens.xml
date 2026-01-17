@@ -99,6 +99,22 @@
     <dimen name="following_name_text_size">14sp</dimen>
     <dimen name="following_name_text_size_tv">16sp</dimen>
 
+    <!-- My following: grid -->
+    <dimen name="following_grid_item_margin">8dp</dimen>
+    <dimen name="following_grid_item_margin_tv">10dp</dimen>
+    <dimen name="following_grid_item_padding">10dp</dimen>
+    <dimen name="following_grid_item_padding_tv">14dp</dimen>
+    <dimen name="following_grid_avatar_size">88dp</dimen>
+    <dimen name="following_grid_avatar_size_tv">112dp</dimen>
+    <dimen name="following_grid_name_margin_top">10dp</dimen>
+    <dimen name="following_grid_name_margin_top_tv">12dp</dimen>
+    <dimen name="following_grid_name_text_size">14sp</dimen>
+    <dimen name="following_grid_name_text_size_tv">18sp</dimen>
+    <dimen name="following_grid_sign_margin_top">4dp</dimen>
+    <dimen name="following_grid_sign_margin_top_tv">6dp</dimen>
+    <dimen name="following_grid_sign_text_size">12sp</dimen>
+    <dimen name="following_grid_sign_text_size_tv">14sp</dimen>
+
     <!-- Search: history/suggest/hot list -->
     <dimen name="search_suggest_margin_bottom">10dp</dimen>
     <dimen name="search_suggest_margin_bottom_tv">14dp</dimen>

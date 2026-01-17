@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="@dimen/following_grid_item_margin"
+    android:background="@drawable/blbl_focus_bg_round"
+    android:clickable="true"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:focusable="true"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="@dimen/following_grid_item_padding"
+    android:stateListAnimator="@animator/blbl_focus_scale">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/iv_avatar"
+        android:layout_width="@dimen/following_grid_avatar_size"
+        android:layout_height="@dimen/following_grid_avatar_size"
+        android:contentDescription="@string/app_name"
+        android:src="@android:drawable/sym_def_app_icon"
+        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay_Blbl_Circular"
+        app:strokeColor="@color/blbl_focus_stroke"
+        app:strokeWidth="2dp" />
+
+    <TextView
+        android:id="@+id/tv_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/following_grid_name_margin_top"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="@color/blbl_text"
+        android:textSize="@dimen/following_grid_name_text_size"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tv_sign"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/following_grid_sign_margin_top"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="@color/blbl_text_secondary"
+        android:textSize="@dimen/following_grid_sign_text_size" />
+
+</LinearLayout>
+
