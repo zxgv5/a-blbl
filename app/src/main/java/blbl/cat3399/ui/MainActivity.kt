@@ -26,6 +26,7 @@ import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.prefs.AppPrefs
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.databinding.ActivityMainBinding
 import blbl.cat3399.databinding.DialogUserInfoBinding
 import blbl.cat3399.feature.category.CategoryFragment
@@ -478,16 +479,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyUiMode() {
         val tvMode = TvMode.isEnabled(this)
-        val sidebarScale = sidebarScaleFor(BiliClient.prefs.sidebarSize)
+        val sizePref = BiliClient.prefs.sidebarSize
+        val sidebarScale = UiScale.factor(this, tvMode, sizePref)
+        val sidebarWidthScale = UiScale.densityFixFactor(this, tvMode)
         if (::navAdapter.isInitialized) {
             navAdapter.setTvMode(tvMode)
             navAdapter.setSidebarScale(sidebarScale)
         }
 
         val widthPx =
-            resources.getDimensionPixelSize(
-                sidebarWidthDimenFor(tvMode, BiliClient.prefs.sidebarSize),
-            )
+            (resources.getDimensionPixelSize(
+                sidebarWidthDimenFor(tvMode, sizePref),
+            ) * sidebarWidthScale).roundToInt().coerceAtLeast(1)
         val lp = binding.sidebar.layoutParams
         if (lp.width != widthPx) {
             lp.width = widthPx
@@ -500,7 +503,7 @@ class MainActivity : AppCompatActivity() {
     private fun applySidebarSizing(tvMode: Boolean, sidebarScale: Float) {
         fun px(id: Int): Int = resources.getDimensionPixelSize(id)
         fun pxF(id: Int): Float = resources.getDimension(id)
-        val scale = sidebarScale.coerceIn(0.75f, 1.35f)
+        val scale = sidebarScale.coerceIn(0.60f, 1.40f)
         fun scaledPx(id: Int): Int = (px(id) * scale).roundToInt()
         fun scaledPxF(id: Int): Float = pxF(id) * scale
 
@@ -616,14 +619,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isInSidebar(view: View): Boolean = isDescendantOf(view, binding.sidebar)
-
-    private fun sidebarScaleFor(prefValue: String): Float {
-        return when (prefValue) {
-            AppPrefs.SIDEBAR_SIZE_SMALL -> 0.90f
-            AppPrefs.SIDEBAR_SIZE_LARGE -> 1.20f
-            else -> 1.00f
-        }
-    }
 
     private fun sidebarWidthDimenFor(tvMode: Boolean, prefValue: String): Int {
         if (tvMode) {

@@ -204,7 +204,7 @@ class SettingsActivity : AppCompatActivity() {
             "页面设置" -> listOf(
                 SettingEntry("每行卡片数量", gridSpanText(prefs.gridSpanCount), "影响推荐/热门/分类（动态单独设置）"),
                 SettingEntry("动态页每行卡片数量", gridSpanText(prefs.dynamicGridSpanCount), "默认 3"),
-                SettingEntry("侧边栏大小", sidebarSizeText(prefs.sidebarSize), "同时调整宽度/按钮尺寸（TV/非TV）"),
+                SettingEntry("界面大小", sidebarSizeText(prefs.sidebarSize), "统一调整视频卡片/侧边栏/播放器（TV 以 1080P x1.50 为基准）"),
                 SettingEntry("TV 模式", tvModeText(prefs.uiMode), "优化遥控器/键盘导航与焦点样式"),
                 SettingEntry("以全屏模式运行", if (prefs.fullscreenEnabled) "开" else "关", "隐藏状态栏/导航栏"),
             )
@@ -314,10 +314,10 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
 
-            "侧边栏大小" -> {
+            "界面大小" -> {
                 val options = listOf("小", "中", "大")
                 showChoiceDialog(
-                    title = "侧边栏大小",
+                    title = "界面大小",
                     items = options,
                     current = sidebarSizeText(prefs.sidebarSize),
                 ) { selected ->
@@ -327,7 +327,7 @@ class SettingsActivity : AppCompatActivity() {
                             "大" -> blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_LARGE
                             else -> blbl.cat3399.core.prefs.AppPrefs.SIDEBAR_SIZE_MEDIUM
                         }
-                    Toast.makeText(this, "侧边栏大小：$selected", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "界面大小：$selected", Toast.LENGTH_SHORT).show()
                     refreshSection(entry.title)
                 }
             }

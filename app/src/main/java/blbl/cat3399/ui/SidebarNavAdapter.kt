@@ -48,7 +48,7 @@ class SidebarNavAdapter(
     }
 
     fun setSidebarScale(scale: Float) {
-        val value = scale.coerceIn(0.75f, 1.35f)
+        val value = scale.coerceIn(0.60f, 1.40f)
         if (sidebarScale == value) return
         sidebarScale = value
         notifyDataSetChanged()
@@ -105,7 +105,7 @@ class SidebarNavAdapter(
             showLabelsAlways: Boolean,
             onClick: () -> Unit,
         ) {
-            val scale = sidebarScale.coerceIn(0.75f, 1.35f)
+            val scale = sidebarScale.coerceIn(0.60f, 1.40f)
             applySizing(tvMode, scale)
 
             binding.ivIcon.setImageResource(item.iconRes)
