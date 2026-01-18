@@ -8,6 +8,7 @@ import android.util.TypedValue
 import android.view.FocusFinder
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -353,38 +354,6 @@ class SearchFragment : Fragment(), BackPressHandler {
     private fun setupQueryInput() {
         val input = binding.tvQuery
 
-        if (isTvMode) {
-            input.apply {
-                isFocusable = false
-                isFocusableInTouchMode = false
-                isCursorVisible = false
-                isLongClickable = false
-                setTextIsSelectable(false)
-                showSoftInputOnFocus = false
-                setOnClickListener(null)
-                setOnFocusChangeListener(null)
-                setOnEditorActionListener(null)
-            }
-            return
-        }
-
-        input.showSoftInputOnFocus = true
-        input.isFocusable = true
-        input.isFocusableInTouchMode = true
-
-        input.setOnClickListener {
-            if (binding.panelResults.visibility == View.VISIBLE) showInput()
-            input.requestFocus()
-            input.setSelection(input.text?.length ?: 0)
-            showIme(input)
-        }
-
-        input.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                input.post { showIme(input) }
-            }
-        }
-
         input.setOnEditorActionListener { _, actionId, event ->
             val isEnter =
                 event != null &&
@@ -401,6 +370,56 @@ class SearchFragment : Fragment(), BackPressHandler {
         input.doAfterTextChanged {
             if (ignoreQueryTextChanges) return@doAfterTextChanged
             setQueryFromTextInput(it?.toString().orEmpty())
+        }
+
+        if (isTvMode) {
+            input.apply {
+                // TV mode defaults to on-screen keyboard + DPAD navigation.
+                // Keep IME disabled on focus, but allow touch users to explicitly open the IME.
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isCursorVisible = false
+                isLongClickable = false
+                setTextIsSelectable(false)
+                showSoftInputOnFocus = false
+                setOnClickListener(null)
+                setOnFocusChangeListener(null)
+            }
+
+            input.setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    if (binding.panelResults.visibility == View.VISIBLE) showInput()
+
+                    // Enable focus + editing only when the user explicitly touches the input.
+                    input.isFocusable = true
+                    input.isFocusableInTouchMode = true
+                    input.isCursorVisible = true
+                    input.isLongClickable = true
+                    input.setTextIsSelectable(true)
+
+                    input.requestFocus()
+                    input.setSelection(input.text?.length ?: 0)
+                    showIme(input)
+                }
+                false
+            }
+            return
+        }
+
+        input.setOnTouchListener(null)
+        input.showSoftInputOnFocus = true
+        input.isFocusable = true
+        input.isFocusableInTouchMode = true
+
+        input.setOnClickListener {
+            if (binding.panelResults.visibility == View.VISIBLE) showInput()
+            input.requestFocus()
+            input.setSelection(input.text?.length ?: 0)
+            showIme(input)
+        }
+
+        input.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) input.post { showIme(input) }
         }
     }
 
@@ -720,7 +739,7 @@ class SearchFragment : Fragment(), BackPressHandler {
         setQuery(keyword)
         BiliClient.prefs.addSearchHistory(keyword)
         reloadHistory()
-        if (!isTvMode) {
+        if (binding.tvQuery.hasFocus()) {
             hideIme(binding.tvQuery)
             binding.tvQuery.clearFocus()
         }
