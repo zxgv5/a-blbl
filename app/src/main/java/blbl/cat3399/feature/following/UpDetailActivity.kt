@@ -273,7 +273,13 @@ class UpDetailActivity : AppCompatActivity() {
         isLoadingMore = true
         lifecycleScope.launch {
             try {
-                val page = BiliApi.dynamicSpaceVideo(hostMid = mid, offset = offset)
+                val page =
+                    BiliApi.dynamicSpaceVideo(
+                        hostMid = mid,
+                        offset = offset,
+                        minCardCount = if (isRefresh && offset.isNullOrBlank()) 24 else 0,
+                        maxPages = 8,
+                    )
                 if (token != requestToken) return@launch
 
                 nextOffset = page.nextOffset

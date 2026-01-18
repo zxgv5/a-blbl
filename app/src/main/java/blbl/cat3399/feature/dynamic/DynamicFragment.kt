@@ -225,7 +225,12 @@ class DynamicFragment : Fragment() {
                 val page = if (selectedMid == FollowingAdapter.MID_ALL) {
                     BiliApi.dynamicAllVideo(offset = nextOffset)
                 } else {
-                    BiliApi.dynamicSpaceVideo(hostMid = selectedMid, offset = nextOffset)
+                    BiliApi.dynamicSpaceVideo(
+                        hostMid = selectedMid,
+                        offset = nextOffset,
+                        minCardCount = if (nextOffset.isNullOrBlank()) 24 else 0,
+                        maxPages = 8,
+                    )
                 }
                 if (token != requestToken) return@launch
 
