@@ -127,6 +127,7 @@ class PlayerActivity : AppCompatActivity() {
     private var reportToken: Int = 0
     private var lastReportAtMs: Long = 0L
     private var lastReportedProgressSec: Long = -1L
+    private var currentViewDurationMs: Long? = null
 
     private class PlaybackTrace(private val id: String) {
         private val startMs = SystemClock.elapsedRealtime()
@@ -530,6 +531,7 @@ class PlayerActivity : AppCompatActivity() {
         lastAvailableAudioIds = emptyList()
         session = session.copy(actualQn = 0)
         session = session.copy(actualAudioId = 0)
+        currentViewDurationMs = null
         subtitleAvailable = false
         subtitleConfig = null
         subtitleItems = emptyList()
@@ -613,6 +615,7 @@ class PlayerActivity : AppCompatActivity() {
                     trace?.log("view:done")
                     val title = viewData.optString("title", "")
                     if (title.isNotBlank()) binding.tvTitle.text = title
+                    currentViewDurationMs = viewData.optLong("duration", -1L).takeIf { it > 0 }?.times(1000L)
                     applyUpInfo(viewData)
 
                     val cid = cidExtra ?: viewData.optLong("cid").takeIf { it > 0 } ?: error("cid missing")
@@ -1535,20 +1538,18 @@ class PlayerActivity : AppCompatActivity() {
         trace?.log("resume:cancel", "reason=$reason")
     }
 
-    private fun showAutoResumeHint(targetMs: Long, delayMs: Long) {
+    private fun showAutoResumeHint(targetMs: Long) {
         dismissAutoResumeHint()
         val timeText = formatHms(targetMs.coerceAtLeast(0L))
-        val sec = (delayMs / 1000L).coerceAtLeast(1L)
-        val msg = "将要跳到上次播放位置（$timeText），按返回取消（${sec}s）"
+        val msg = "将要跳到上次播放位置（$timeText），按返回取消"
         autoResumeHintVisible = true
         // Reuse the existing bottom "seek hint" component for consistent look & feel.
         showSeekHint(msg, hold = true)
+        // Keep the hint visible until either:
+        // - user cancels (back / user seek), or
+        // - auto-resume seek happens.
         autoResumeHintTimeoutJob?.cancel()
-        autoResumeHintTimeoutJob =
-            lifecycleScope.launch {
-                delay(3_000)
-                dismissAutoResumeHint()
-            }
+        autoResumeHintTimeoutJob = null
     }
 
     private fun dismissAutoResumeHint() {
@@ -1639,20 +1640,40 @@ class PlayerActivity : AppCompatActivity() {
         trace?.log("resume:pending", "src=${candidate.source} raw=${candidate.rawTime}")
 
         val delayMs = 2_000L
-        val previewTargetMs = normalizeResumePositionMs(candidate.rawTime, candidate.rawTimeUnitHint, durationMs = null) ?: return
-        if (!shouldAutoResumeTo(previewTargetMs, durationMs = null)) return
-        showAutoResumeHint(targetMs = previewTargetMs, delayMs = delayMs)
+        val showAtMs = SystemClock.elapsedRealtime()
+        val seekNotBeforeAtMs = showAtMs + delayMs
+        val previewDurationMs = exo.duration.takeIf { it > 0 } ?: currentViewDurationMs
+        val previewTargetMs = normalizeResumePositionMs(candidate.rawTime, candidate.rawTimeUnitHint, previewDurationMs)
+        if (previewTargetMs == null) return
+        if (!shouldAutoResumeTo(previewTargetMs, previewDurationMs)) return
+        showAutoResumeHint(targetMs = previewTargetMs)
 
         autoResumeJob =
             lifecycleScope.launch {
-                delay(delayMs)
+                // Seeking too early (while the beginning is still buffering) can cause some long videos to get stuck
+                // with a black screen. Wait until the player becomes READY, then apply the minimum delay.
+                val readyDeadlineAtMs = SystemClock.elapsedRealtime() + 30_000L
+                while (isActive) {
+                    if (autoResumeCancelledByUser) return@launch
+                    if (playbackToken != autoResumeToken) return@launch
+                    val p = player ?: return@launch
+                    if (p !== exo) return@launch
+                    val state = p.playbackState
+                    if (state == Player.STATE_READY) break
+                    if (state == Player.STATE_ENDED) return@launch
+                    if (SystemClock.elapsedRealtime() >= readyDeadlineAtMs) return@launch
+                    delay(50L)
+                }
+
+                val remainMs = (seekNotBeforeAtMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+                if (remainMs > 0) delay(remainMs)
                 if (!isActive) return@launch
                 if (autoResumeCancelledByUser) return@launch
                 if (playbackToken != autoResumeToken) return@launch
                 val p = player ?: return@launch
                 if (p !== exo) return@launch
 
-                val durationMs = p.duration.takeIf { it > 0 }
+                val durationMs = p.duration.takeIf { it > 0 } ?: currentViewDurationMs
                 val targetMs = normalizeResumePositionMs(candidate.rawTime, candidate.rawTimeUnitHint, durationMs) ?: return@launch
                 if (!shouldAutoResumeTo(targetMs, durationMs)) return@launch
                 val clamped = durationMs?.let { dur -> targetMs.coerceIn(0L, (dur - 500L).coerceAtLeast(0L)) } ?: targetMs
@@ -2567,7 +2588,14 @@ class PlayerActivity : AppCompatActivity() {
         val h = totalSec / 3600
         val m = (totalSec % 3600) / 60
         val s = totalSec % 60
-        return String.format(Locale.US, "%d:%02d:%02d", h, m, s)
+        // Keep the same style as other duration displays:
+        // - < 1h: mm:ss (00:06 / 15:10)
+        // - >= 1h: h:mm:ss (1:01:20)
+        return if (h > 0) {
+            String.format(Locale.US, "%d:%02d:%02d", h, m, s)
+        } else {
+            String.format(Locale.US, "%02d:%02d", m, s)
+        }
     }
 
     private data class SubtitleItem(
