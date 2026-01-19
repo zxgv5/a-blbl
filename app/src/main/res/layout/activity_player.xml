@@ -256,6 +256,23 @@
             app:layout_constraintTop_toTopOf="@id/controls_row" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <ProgressBar
+        android:id="@+id/progress_persistent_bottom"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/player_persistent_progress_height"
+        android:clickable="false"
+        android:focusable="false"
+        android:indeterminate="false"
+        android:max="10000"
+        android:progress="0"
+        android:progressDrawable="@drawable/progress_player_persistent"
+        android:secondaryProgress="0"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/player_view"
+        app:layout_constraintEnd_toEndOf="@id/player_view"
+        app:layout_constraintStart_toStartOf="@id/player_view" />
+
     <TextView
         android:id="@+id/tv_debug"
         android:layout_width="0dp"

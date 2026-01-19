@@ -163,6 +163,8 @@
     <dimen name="player_bottom_bar_padding_v_tv">8dp</dimen>
     <dimen name="player_seekbar_height">8dp</dimen>
     <dimen name="player_seekbar_height_tv">8dp</dimen>
+    <dimen name="player_persistent_progress_height">3dp</dimen>
+    <dimen name="player_persistent_progress_height_tv">3dp</dimen>
     <dimen name="player_seekbar_margin_bottom">6dp</dimen>
     <dimen name="player_seekbar_margin_bottom_tv">10dp</dimen>
 

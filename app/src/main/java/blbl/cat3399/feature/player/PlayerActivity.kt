@@ -190,6 +190,8 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.topBar.visibility = View.GONE
         binding.bottomBar.visibility = View.GONE
+        binding.progressPersistentBottom.max = SEEK_MAX
+        updatePersistentBottomProgressBarVisibility()
         binding.tvSeekHint.visibility = View.GONE
         binding.btnBack.setOnClickListener { finish() }
         binding.tvOnline.text = "-人正在观看"
@@ -375,6 +377,12 @@ class PlayerActivity : AppCompatActivity() {
                 "调试信息" -> {
                     session = session.copy(debugEnabled = !session.debugEnabled)
                     updateDebugOverlay()
+                    (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
+                }
+                "底部常驻进度条" -> {
+                    val appPrefs = BiliClient.prefs
+                    appPrefs.playerPersistentBottomProgressEnabled = !appPrefs.playerPersistentBottomProgressEnabled
+                    updatePersistentBottomProgressBarVisibility()
                     (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
                 }
                 else -> Toast.makeText(this, "暂未实现：${item.title}", Toast.LENGTH_SHORT).show()
@@ -986,6 +994,8 @@ class PlayerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyUiMode()
+        updatePersistentBottomProgressBarVisibility()
+        (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -1361,7 +1371,15 @@ class PlayerActivity : AppCompatActivity() {
         val show = visible || binding.settingsPanel.visibility == View.VISIBLE
         binding.topBar.visibility = if (show) View.VISIBLE else View.GONE
         binding.bottomBar.visibility = if (show) View.VISIBLE else View.GONE
+        updatePersistentBottomProgressBarVisibility()
         if (visible) noteUserInteraction() else autoHideJob?.cancel()
+    }
+
+    private fun updatePersistentBottomProgressBarVisibility() {
+        val enabled = BiliClient.prefs.playerPersistentBottomProgressEnabled
+        val showControls = controlsVisible || binding.settingsPanel.visibility == View.VISIBLE
+        val v = if (enabled && !showControls) View.VISIBLE else View.GONE
+        if (binding.progressPersistentBottom.visibility != v) binding.progressPersistentBottom.visibility = v
     }
 
     private fun restartAutoHideTimer() {
@@ -1587,19 +1605,25 @@ class PlayerActivity : AppCompatActivity() {
 
         val enabled = duration > 0
         binding.seekProgress.isEnabled = enabled
+        binding.progressPersistentBottom.isEnabled = enabled
         if (enabled) {
             val bufferedProgress =
                 ((bufPos.toDouble() / duration.toDouble()) * SEEK_MAX)
                     .toInt()
                     .coerceIn(0, SEEK_MAX)
             binding.seekProgress.secondaryProgress = bufferedProgress
+            binding.progressPersistentBottom.secondaryProgress = bufferedProgress
 
             if (!scrubbing) {
                 val p = ((pos.toDouble() / duration.toDouble()) * SEEK_MAX).toInt().coerceIn(0, SEEK_MAX)
                 binding.seekProgress.progress = p
             }
+            val pNow = ((pos.toDouble() / duration.toDouble()) * SEEK_MAX).toInt().coerceIn(0, SEEK_MAX)
+            binding.progressPersistentBottom.progress = pNow
         } else {
             binding.seekProgress.secondaryProgress = 0
+            binding.progressPersistentBottom.secondaryProgress = 0
+            binding.progressPersistentBottom.progress = 0
         }
         requestDanmakuSegmentsForPosition(pos, immediate = false)
     }
@@ -1897,6 +1921,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
     private fun refreshSettings(adapter: PlayerSettingsAdapter) {
+        val prefs = BiliClient.prefs
         adapter.submit(
             listOf(
                 PlayerSettingsAdapter.SettingItem("分辨率", resolutionSubtitle()),
@@ -1910,6 +1935,7 @@ class PlayerActivity : AppCompatActivity() {
                 PlayerSettingsAdapter.SettingItem("弹幕速度", session.danmaku.speedLevel.toString()),
                 PlayerSettingsAdapter.SettingItem("弹幕区域", areaText(session.danmaku.area)),
                 PlayerSettingsAdapter.SettingItem("调试信息", if (session.debugEnabled) "开" else "关"),
+                PlayerSettingsAdapter.SettingItem("底部常驻进度条", if (prefs.playerPersistentBottomProgressEnabled) "开" else "关"),
             ),
         )
     }
@@ -3290,6 +3316,17 @@ class PlayerActivity : AppCompatActivity() {
                 lp.height = height
                 lp.bottomMargin = mb
                 binding.seekProgress.layoutParams = lp
+            }
+        }
+
+        (binding.progressPersistentBottom.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val height =
+                scaledPx(
+                    if (tvMode) R.dimen.player_persistent_progress_height_tv else R.dimen.player_persistent_progress_height,
+                ).coerceAtLeast(1)
+            if (lp.height != height) {
+                lp.height = height
+                binding.progressPersistentBottom.layoutParams = lp
             }
         }
 

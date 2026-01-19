@@ -142,6 +142,10 @@ class AppPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_PLAYER_DOUBLE_BACK_ON_ENDED, true)
         set(value) = prefs.edit().putBoolean(KEY_PLAYER_DOUBLE_BACK_ON_ENDED, value).apply()
 
+    var playerPersistentBottomProgressEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS, false)
+        set(value) = prefs.edit().putBoolean(KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS, value).apply()
+
     var playerPlaybackMode: String
         get() = prefs.getString(KEY_PLAYER_PLAYBACK_MODE, PLAYER_PLAYBACK_MODE_NONE) ?: PLAYER_PLAYBACK_MODE_NONE
         set(value) = prefs.edit().putString(KEY_PLAYER_PLAYBACK_MODE, value).apply()
@@ -250,6 +254,7 @@ class AppPrefs(context: Context) {
         private const val KEY_FULLSCREEN = "fullscreen_enabled"
         private const val KEY_PLAYER_DEBUG = "player_debug_enabled"
         private const val KEY_PLAYER_DOUBLE_BACK_ON_ENDED = "player_double_back_on_ended"
+        private const val KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS = "player_persistent_bottom_progress"
         private const val KEY_PLAYER_PLAYBACK_MODE = "player_playback_mode"
         private const val KEY_GRID_SPAN = "grid_span"
         private const val KEY_DYNAMIC_GRID_SPAN = "dynamic_grid_span"

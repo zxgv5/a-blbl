@@ -230,6 +230,7 @@ class SettingsActivity : AppCompatActivity() {
                 SettingEntry("视频编码", prefs.playerPreferredCodec, "AVC/HEVC/AV1"),
                 SettingEntry("显示视频调试信息", if (prefs.playerDebugEnabled) "开" else "关", "播放器左上角调试框"),
                 SettingEntry("播放结束双击返回", if (prefs.playerDoubleBackOnEnded) "开" else "关", "关=播放结束时按一次返回直接退出"),
+                SettingEntry("底部常驻进度条", if (prefs.playerPersistentBottomProgressEnabled) "开" else "关", "控制栏隐藏时在底部显示进度"),
             )
 
             "弹幕设置" -> listOf(
@@ -598,6 +599,11 @@ class SettingsActivity : AppCompatActivity() {
 
             "播放结束双击返回" -> {
                 prefs.playerDoubleBackOnEnded = !prefs.playerDoubleBackOnEnded
+                refreshSection(entry.title)
+            }
+
+            "底部常驻进度条" -> {
+                prefs.playerPersistentBottomProgressEnabled = !prefs.playerPersistentBottomProgressEnabled
                 refreshSection(entry.title)
             }
 
