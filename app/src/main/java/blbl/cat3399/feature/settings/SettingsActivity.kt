@@ -230,6 +230,7 @@ class SettingsActivity : AppCompatActivity() {
                 SettingEntry("字幕语言", subtitleLangText(prefs.subtitlePreferredLang), "自动/优先匹配"),
                 SettingEntry("默认开启字幕", if (prefs.subtitleEnabledDefault) "开" else "关", "进入播放页时默认状态"),
                 SettingEntry("视频编码", prefs.playerPreferredCodec, "AVC/HEVC/AV1"),
+                SettingEntry("控制栏按钮", playerActionButtonsText(prefs.playerActionButtons), "选择显示点赞/投币/收藏"),
                 SettingEntry("显示视频调试信息", if (prefs.playerDebugEnabled) "开" else "关", "播放器左上角调试框"),
                 SettingEntry("播放结束双击返回", if (prefs.playerDoubleBackOnEnded) "开" else "关", "关=播放结束时按一次返回直接退出"),
                 SettingEntry("底部常驻进度条", if (prefs.playerPersistentBottomProgressEnabled) "开" else "关", "控制栏隐藏时在底部显示进度"),
@@ -604,6 +605,8 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
 
+            "控制栏按钮" -> showPlayerActionButtonsDialog(sectionIndex = currentSectionIndex, focusTitle = entry.title)
+
             "显示视频调试信息" -> {
                 prefs.playerDebugEnabled = !prefs.playerDebugEnabled
                 refreshSection(entry.title)
@@ -918,6 +921,38 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun showPlayerActionButtonsDialog(sectionIndex: Int, focusTitle: String) {
+        val prefs = BiliClient.prefs
+        val options =
+            listOf(
+                blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_LIKE to "点赞",
+                blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_COIN to "投币",
+                blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_FAV to "收藏",
+            )
+        val keys = options.map { it.first }
+        val labels = options.map { it.second }.toTypedArray()
+
+        val selected = prefs.playerActionButtons.toMutableSet()
+        val checked = BooleanArray(keys.size) { idx -> selected.contains(keys[idx]) }
+
+        val dialog =
+            MaterialAlertDialogBuilder(this)
+                .setTitle("控制栏按钮")
+                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                    val key = keys[which]
+                    if (isChecked) selected.add(key) else selected.remove(key)
+                }
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确定") { _, _ ->
+                    prefs.playerActionButtons = keys.filter { selected.contains(it) }
+                    showSection(sectionIndex, focusTitle = focusTitle)
+                }
+                .create()
+
+        dialog.setOnShowListener { dialog.listView?.requestFocus() }
+        dialog.show()
+    }
+
     private fun showUserAgentDialog(sectionIndex: Int, focusTitle: String) {
         val prefs = BiliClient.prefs
         val input = EditText(this).apply {
@@ -1116,6 +1151,17 @@ class SettingsActivity : AppCompatActivity() {
     private fun cdnText(code: String): String = when (code) {
         blbl.cat3399.core.prefs.AppPrefs.PLAYER_CDN_MCDN -> "mcdn"
         else -> "bilivideo"
+    }
+
+    private fun playerActionButtonsText(buttons: List<String>): String {
+        val enabled = buttons.toSet()
+        val labels =
+            buildList {
+                if (enabled.contains(blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_LIKE)) add("点赞")
+                if (enabled.contains(blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_COIN)) add("投币")
+                if (enabled.contains(blbl.cat3399.core.prefs.AppPrefs.PLAYER_ACTION_BTN_FAV)) add("收藏")
+            }
+        return if (labels.isEmpty()) "无" else labels.joinToString(separator = " / ")
     }
 
     private fun screenText(): String {

@@ -158,6 +158,10 @@ class AppPrefs(context: Context) {
         get() = prefs.getString(KEY_PLAYER_PLAYBACK_MODE, PLAYER_PLAYBACK_MODE_NONE) ?: PLAYER_PLAYBACK_MODE_NONE
         set(value) = prefs.edit().putString(KEY_PLAYER_PLAYBACK_MODE, value).apply()
 
+    var playerActionButtons: List<String>
+        get() = loadStringList(KEY_PLAYER_ACTION_BUTTONS)
+        set(value) = saveStringList(KEY_PLAYER_ACTION_BUTTONS, value)
+
     var gridSpanCount: Int
         get() = prefs.getInt(KEY_GRID_SPAN, 0) // 0 => auto
         set(value) = prefs.edit().putInt(KEY_GRID_SPAN, value).apply()
@@ -266,6 +270,7 @@ class AppPrefs(context: Context) {
         private const val KEY_PLAYER_DOUBLE_BACK_ON_ENDED = "player_double_back_on_ended"
         private const val KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS = "player_persistent_bottom_progress"
         private const val KEY_PLAYER_PLAYBACK_MODE = "player_playback_mode"
+        private const val KEY_PLAYER_ACTION_BUTTONS = "player_action_buttons"
         private const val KEY_GRID_SPAN = "grid_span"
         private const val KEY_DYNAMIC_GRID_SPAN = "dynamic_grid_span"
         private const val KEY_SEARCH_HISTORY = "search_history"
@@ -283,6 +288,10 @@ class AppPrefs(context: Context) {
         const val PLAYER_PLAYBACK_MODE_NEXT = "next"
         const val PLAYER_PLAYBACK_MODE_NONE = "none"
         const val PLAYER_PLAYBACK_MODE_EXIT = "exit"
+
+        const val PLAYER_ACTION_BTN_LIKE = "like"
+        const val PLAYER_ACTION_BTN_COIN = "coin"
+        const val PLAYER_ACTION_BTN_FAV = "fav"
 
         private fun generateBuvid(): String {
             val bytes = ByteArray(16)

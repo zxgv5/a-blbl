@@ -110,6 +110,13 @@ class PlayerActivity : AppCompatActivity() {
     private var loadJob: kotlinx.coroutines.Job? = null
     private var lastEndedActionAtMs: Long = 0L
     private var playbackUncaughtHandler: CoroutineExceptionHandler? = null
+    private var actionLiked: Boolean = false
+    private var actionCoinCount: Int = 0
+    private var actionFavored: Boolean = false
+    private var likeActionJob: kotlinx.coroutines.Job? = null
+    private var coinActionJob: kotlinx.coroutines.Job? = null
+    private var favDialogJob: kotlinx.coroutines.Job? = null
+    private var favApplyJob: kotlinx.coroutines.Job? = null
 
     private var smartSeekDirection: Int = 0
     private var smartSeekStreak: Int = 0
@@ -418,6 +425,7 @@ class PlayerActivity : AppCompatActivity() {
         updateDebugOverlay()
 
         initControls(exo)
+        applyActionButtonsVisibility()
 
         val uncaughtHandler =
             CoroutineExceptionHandler { _, t ->
@@ -646,6 +654,20 @@ class PlayerActivity : AppCompatActivity() {
         danmakuAll.clear()
         binding.danmakuView.setDanmakus(emptyList())
         binding.danmakuView.notifySeek(0L)
+
+        likeActionJob?.cancel()
+        likeActionJob = null
+        coinActionJob?.cancel()
+        coinActionJob = null
+        favDialogJob?.cancel()
+        favDialogJob = null
+        favApplyJob?.cancel()
+        favApplyJob = null
+        actionLiked = false
+        actionCoinCount = 0
+        actionFavored = false
+        updateActionButtonsUi()
+
         playbackConstraints = PlaybackConstraints()
         decodeFallbackAttempted = false
         lastPickedDash = null
@@ -1036,6 +1058,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyUiMode()
+        applyActionButtonsVisibility()
         updatePersistentBottomProgressBarVisibility()
         (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
     }
@@ -1279,6 +1302,10 @@ class PlayerActivity : AppCompatActivity() {
             setControlsVisible(true)
         }
 
+        binding.btnLike.setOnClickListener { onLikeButtonClicked() }
+        binding.btnCoin.setOnClickListener { onCoinButtonClicked() }
+        binding.btnFav.setOnClickListener { onFavButtonClicked() }
+
         binding.btnPlayPause.setOnClickListener {
             if (exo.isPlaying) exo.pause() else exo.play()
             setControlsVisible(true)
@@ -1407,7 +1434,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun toggleControls() {
         val willShow = !controlsVisible
-        if (!willShow) binding.settingsPanel.visibility = View.GONE
+        if (!willShow) {
+            binding.settingsPanel.visibility = View.GONE
+        }
         setControlsVisible(willShow)
     }
 
@@ -1459,6 +1488,210 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun hasControlsFocus(): Boolean =
         binding.topBar.hasFocus() || binding.bottomBar.hasFocus() || binding.settingsPanel.hasFocus()
+
+    private fun applyActionButtonsVisibility() {
+        val enabled = BiliClient.prefs.playerActionButtons.toSet()
+        binding.btnLike.visibility = if (enabled.contains(AppPrefs.PLAYER_ACTION_BTN_LIKE)) View.VISIBLE else View.GONE
+        binding.btnCoin.visibility = if (enabled.contains(AppPrefs.PLAYER_ACTION_BTN_COIN)) View.VISIBLE else View.GONE
+        binding.btnFav.visibility = if (enabled.contains(AppPrefs.PLAYER_ACTION_BTN_FAV)) View.VISIBLE else View.GONE
+        updateActionButtonsUi()
+    }
+
+    private fun updateActionButtonsUi() {
+        updateLikeButtonUi()
+        updateCoinButtonUi()
+        updateFavButtonUi()
+    }
+
+    private fun updateLikeButtonUi() {
+        val active = actionLiked
+        val colorRes = if (active) R.color.blbl_blue else R.color.blbl_text
+        binding.btnLike.imageTintList = ContextCompat.getColorStateList(this, colorRes)
+        binding.btnLike.isEnabled = true
+        binding.btnLike.alpha = 1.0f
+    }
+
+    private fun updateCoinButtonUi() {
+        val active = actionCoinCount > 0
+        val colorRes = if (active) R.color.blbl_blue else R.color.blbl_text
+        binding.btnCoin.imageTintList = ContextCompat.getColorStateList(this, colorRes)
+        binding.btnCoin.isEnabled = true
+        binding.btnCoin.alpha = 1.0f
+    }
+
+    private fun updateFavButtonUi() {
+        val active = actionFavored
+        val colorRes = if (active) R.color.blbl_blue else R.color.blbl_text
+        binding.btnFav.imageTintList = ContextCompat.getColorStateList(this, colorRes)
+        binding.btnFav.isEnabled = true
+        binding.btnFav.alpha = 1.0f
+    }
+
+    private fun onLikeButtonClicked() {
+        if (likeActionJob?.isActive == true) return
+        val requestBvid = currentBvid.trim().takeIf { it.isNotBlank() } ?: return
+        val targetLike = !actionLiked
+        setControlsVisible(true)
+
+        likeActionJob =
+            lifecycleScope.launch {
+                try {
+                    updateLikeButtonUi()
+                    BiliApi.archiveLike(bvid = requestBvid, aid = currentAid, like = targetLike)
+                    if (currentBvid != requestBvid) return@launch
+                    actionLiked = targetLike
+                    Toast.makeText(this@PlayerActivity, if (targetLike) "点赞成功" else "已取消赞", Toast.LENGTH_SHORT).show()
+                } catch (t: Throwable) {
+                    if (t is CancellationException) return@launch
+                    val e = t as? BiliApiException
+                    if (targetLike && e?.apiCode == 65006) {
+                        if (currentBvid != requestBvid) return@launch
+                        actionLiked = true
+                        Toast.makeText(this@PlayerActivity, "已点赞", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val msg = e?.apiMessage?.takeIf { it.isNotBlank() } ?: (t.message ?: "操作失败")
+                        Toast.makeText(this@PlayerActivity, msg, Toast.LENGTH_SHORT).show()
+                    }
+                } finally {
+                    likeActionJob = null
+                    updateLikeButtonUi()
+                }
+            }
+    }
+
+    private fun onCoinButtonClicked() {
+        if (coinActionJob?.isActive == true) return
+        if (actionCoinCount >= 2) return
+        val requestBvid = currentBvid.trim().takeIf { it.isNotBlank() } ?: return
+        setControlsVisible(true)
+
+        coinActionJob =
+            lifecycleScope.launch {
+                try {
+                    updateCoinButtonUi()
+                    BiliApi.coinAdd(bvid = requestBvid, aid = currentAid, multiply = 1, selectLike = false)
+                    if (currentBvid != requestBvid) return@launch
+                    actionCoinCount = (actionCoinCount + 1).coerceAtMost(2)
+                    Toast.makeText(this@PlayerActivity, "投币成功", Toast.LENGTH_SHORT).show()
+                } catch (t: Throwable) {
+                    if (t is CancellationException) return@launch
+                    val e = t as? BiliApiException
+                    if (e?.apiCode == 34005) {
+                        if (currentBvid != requestBvid) return@launch
+                        actionCoinCount = 2
+                        Toast.makeText(this@PlayerActivity, "已达到投币上限", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val msg = e?.apiMessage?.takeIf { it.isNotBlank() } ?: (t.message ?: "操作失败")
+                        Toast.makeText(this@PlayerActivity, msg, Toast.LENGTH_SHORT).show()
+                    }
+                } finally {
+                    coinActionJob = null
+                    updateCoinButtonUi()
+                }
+            }
+    }
+
+    private fun onFavButtonClicked() {
+        if (favDialogJob?.isActive == true || favApplyJob?.isActive == true) return
+        val selfMid = BiliClient.cookies.getCookieValue("DedeUserID")?.trim()?.toLongOrNull()?.takeIf { it > 0L }
+        if (selfMid == null) {
+            Toast.makeText(this, "请先登录后再收藏", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val aid = currentAid?.takeIf { it > 0L }
+        if (aid == null) {
+            Toast.makeText(this, "未获取到 aid，暂不支持收藏", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val requestBvid = currentBvid
+        val requestAid = aid
+        setControlsVisible(true)
+
+        favDialogJob =
+            lifecycleScope.launch {
+                try {
+                    updateFavButtonUi()
+                    val folders =
+                        withContext(Dispatchers.IO) {
+                            BiliApi.favFoldersWithState(upMid = selfMid, rid = requestAid)
+                        }
+                    if (currentBvid != requestBvid) return@launch
+                    if (folders.isEmpty()) {
+                        Toast.makeText(this@PlayerActivity, "未获取到收藏夹", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+
+                    val initial = folders.filter { it.favState }.map { it.mediaId }.toSet()
+
+                    actionFavored = initial.isNotEmpty()
+                    updateFavButtonUi()
+
+                    val labels =
+                        folders.map { folder ->
+                            if (folder.favState) "${folder.title}（已收藏）" else folder.title
+                        }
+                    SingleChoiceDialog.show(
+                        context = this@PlayerActivity,
+                        title = "选择收藏夹",
+                        items = labels,
+                        checkedIndex = 0,
+                        negativeText = "取消",
+                        onNegative = { binding.btnFav.post { binding.btnFav.requestFocus() } },
+                    ) { index, _ ->
+                        val picked = folders.getOrNull(index)
+                        if (picked == null) {
+                            binding.btnFav.post { binding.btnFav.requestFocus() }
+                            return@show
+                        }
+
+                        val nextSelected = initial.toMutableSet()
+                        if (nextSelected.contains(picked.mediaId)) nextSelected.remove(picked.mediaId) else nextSelected.add(picked.mediaId)
+                        val add = (nextSelected - initial).toList()
+                        val del = (initial - nextSelected).toList()
+                        if (add.isNotEmpty() || del.isNotEmpty()) {
+                            applyFavSelection(rid = requestAid, add = add, del = del, selected = nextSelected.toSet())
+                        }
+                        binding.btnFav.post { binding.btnFav.requestFocus() }
+                    }
+                } catch (t: Throwable) {
+                    if (t is CancellationException) return@launch
+                    val e = t as? BiliApiException
+                    val msg = e?.apiMessage?.takeIf { it.isNotBlank() } ?: (t.message ?: "加载收藏夹失败")
+                    Toast.makeText(this@PlayerActivity, msg, Toast.LENGTH_SHORT).show()
+                } finally {
+                    favDialogJob = null
+                    updateFavButtonUi()
+                }
+            }
+    }
+
+    private fun applyFavSelection(
+        rid: Long,
+        add: List<Long>,
+        del: List<Long>,
+        selected: Set<Long>,
+    ) {
+        if (favApplyJob?.isActive == true) return
+        favApplyJob =
+            lifecycleScope.launch {
+                try {
+                    updateFavButtonUi()
+                    BiliApi.favResourceDeal(rid = rid, addMediaIds = add, delMediaIds = del)
+                    actionFavored = selected.isNotEmpty()
+                    updateFavButtonUi()
+                    Toast.makeText(this@PlayerActivity, "收藏已更新", Toast.LENGTH_SHORT).show()
+                } catch (t: Throwable) {
+                    if (t is CancellationException) return@launch
+                    val e = t as? BiliApiException
+                    val msg = e?.apiMessage?.takeIf { it.isNotBlank() } ?: (t.message ?: "操作失败")
+                    Toast.makeText(this@PlayerActivity, msg, Toast.LENGTH_SHORT).show()
+                } finally {
+                    favApplyJob = null
+                    updateFavButtonUi()
+                }
+            }
+    }
 
     private fun focusFirstControl() {
         binding.btnPlayPause.post { binding.btnPlayPause.requestFocus() }
@@ -3619,6 +3852,16 @@ class PlayerActivity : AppCompatActivity() {
         listOf(binding.btnSubtitle, binding.btnDanmaku, binding.btnUp).forEach { btn ->
             setSize(btn, controlSize, subtitleHeight)
             btn.setPadding(controlPad, controlPad, controlPad, controlPad)
+        }
+        run {
+            val factor = 0.8f
+            val actionSize = (controlSize * factor).roundToInt().coerceAtLeast(1)
+            val actionHeight = (subtitleHeight * factor).roundToInt().coerceAtLeast(1)
+            val actionPad = (controlPad * factor).roundToInt().coerceAtLeast(0)
+            listOf(binding.btnLike, binding.btnCoin, binding.btnFav).forEach { btn ->
+                setSize(btn, actionSize, actionHeight)
+                btn.setPadding(actionPad, actionPad, actionPad, actionPad)
+            }
         }
         run {
             val btn = binding.btnAdvanced
