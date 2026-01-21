@@ -15,6 +15,9 @@ import blbl.cat3399.core.image.ImageLoader
 import blbl.cat3399.core.image.ImageUrl
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.model.BangumiEpisode
+import blbl.cat3399.core.net.BiliClient
+import blbl.cat3399.core.tv.TvMode
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.core.util.Format
 import blbl.cat3399.databinding.FragmentMyBangumiDetailBinding
 import blbl.cat3399.feature.player.PlayerActivity
@@ -24,6 +27,7 @@ import blbl.cat3399.ui.RefreshKeyHandler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class MyBangumiDetailFragment : Fragment(), RefreshKeyHandler {
     private var _binding: FragmentMyBangumiDetailBinding? = null
@@ -57,6 +61,7 @@ class MyBangumiDetailFragment : Fragment(), RefreshKeyHandler {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.btnBack.setOnClickListener { parentFragmentManager.popBackStackImmediate() }
         binding.btnSecondary.text = if (isDrama) "已追剧" else "已追番"
+        applyBackButtonSizing()
 
         epAdapter =
             BangumiEpisodeAdapter { ep, pos ->
@@ -88,8 +93,39 @@ class MyBangumiDetailFragment : Fragment(), RefreshKeyHandler {
 
     override fun onResume() {
         super.onResume()
+        applyBackButtonSizing()
         tryAutoFocusPrimary()
         load()
+    }
+
+    private fun applyBackButtonSizing() {
+        val b = _binding ?: return
+        val tvMode = TvMode.isEnabled(requireContext())
+        val sidebarScale =
+            (UiScale.factor(requireContext(), tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
+        fun px(id: Int): Int = b.root.resources.getDimensionPixelSize(id)
+        fun scaledPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
+
+        val sizePx =
+            scaledPx(if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_size_tv else blbl.cat3399.R.dimen.sidebar_settings_size).coerceAtLeast(1)
+        val padPx =
+            scaledPx(if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_padding_tv else blbl.cat3399.R.dimen.sidebar_settings_padding)
+
+        val lp = b.btnBack.layoutParams
+        if (lp.width != sizePx || lp.height != sizePx) {
+            lp.width = sizePx
+            lp.height = sizePx
+            b.btnBack.layoutParams = lp
+        }
+        if (
+            b.btnBack.paddingLeft != padPx ||
+            b.btnBack.paddingTop != padPx ||
+            b.btnBack.paddingRight != padPx ||
+            b.btnBack.paddingBottom != padPx
+        ) {
+            b.btnBack.setPadding(padPx, padPx, padPx, padPx)
+        }
     }
 
     override fun handleRefreshKey(): Boolean {

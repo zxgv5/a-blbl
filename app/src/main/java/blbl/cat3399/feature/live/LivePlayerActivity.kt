@@ -196,11 +196,15 @@ class LivePlayerActivity : AppCompatActivity() {
         val uiScale =
             (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * autoScale)
                 .coerceIn(0.80f, 1.45f)
+        val sidebarScale =
+            (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
 
         fun px(id: Int): Int = resources.getDimensionPixelSize(id)
         fun pxF(id: Int): Float = resources.getDimension(id)
         fun scaledPx(id: Int): Int = (px(id) * uiScale).roundToInt().coerceAtLeast(0)
         fun scaledPxF(id: Int): Float = pxF(id) * uiScale
+        fun scaledSidebarPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
 
         val topPadH =
             scaledPx(if (tvMode) blbl.cat3399.R.dimen.player_top_bar_padding_h_tv else blbl.cat3399.R.dimen.player_top_bar_padding_h)
@@ -219,8 +223,16 @@ class LivePlayerActivity : AppCompatActivity() {
             scaledPx(if (tvMode) blbl.cat3399.R.dimen.player_top_button_size_tv else blbl.cat3399.R.dimen.player_top_button_size).coerceAtLeast(1)
         val topBtnPad =
             scaledPx(if (tvMode) blbl.cat3399.R.dimen.player_top_button_padding_tv else blbl.cat3399.R.dimen.player_top_button_padding)
-        setSize(binding.btnBack, topBtnSize, topBtnSize)
-        binding.btnBack.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
+        val backBtnSize =
+            scaledSidebarPx(
+                if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_size_tv else blbl.cat3399.R.dimen.sidebar_settings_size,
+            ).coerceAtLeast(1)
+        val backBtnPad =
+            scaledSidebarPx(
+                if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_padding_tv else blbl.cat3399.R.dimen.sidebar_settings_padding,
+            )
+        setSize(binding.btnBack, backBtnSize, backBtnSize)
+        binding.btnBack.setPadding(backBtnPad, backBtnPad, backBtnPad, backBtnPad)
         setSize(binding.btnSettings, topBtnSize, topBtnSize)
         binding.btnSettings.setPadding(topBtnPad, topBtnPad, topBtnPad, topBtnPad)
 

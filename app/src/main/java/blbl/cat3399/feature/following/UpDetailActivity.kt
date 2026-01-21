@@ -22,6 +22,7 @@ import blbl.cat3399.core.tv.RemoteKeys
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.ActivityStackLimiter
 import blbl.cat3399.core.ui.Immersive
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.databinding.ActivityUpDetailBinding
 import blbl.cat3399.feature.login.QrLoginActivity
 import blbl.cat3399.feature.player.PlayerActivity
@@ -29,6 +30,7 @@ import blbl.cat3399.feature.player.PlayerPlaylistItem
 import blbl.cat3399.feature.player.PlayerPlaylistStore
 import blbl.cat3399.feature.video.VideoCardAdapter
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class UpDetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityUpDetailBinding
@@ -56,6 +58,7 @@ class UpDetailActivity : AppCompatActivity() {
         binding = ActivityUpDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
+        applyUiMode()
 
         if (mid <= 0L) {
             Toast.makeText(this, "无效的 UP 主 mid", Toast.LENGTH_SHORT).show()
@@ -190,6 +193,33 @@ class UpDetailActivity : AppCompatActivity() {
         resetAndLoad()
     }
 
+    private fun applyUiMode() {
+        val tvMode = TvMode.isEnabled(this)
+        val sidebarScale =
+            (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
+        fun px(id: Int): Int = resources.getDimensionPixelSize(id)
+        fun scaledPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
+
+        val sizePx = scaledPx(if (tvMode) R.dimen.sidebar_settings_size_tv else R.dimen.sidebar_settings_size).coerceAtLeast(1)
+        val padPx = scaledPx(if (tvMode) R.dimen.sidebar_settings_padding_tv else R.dimen.sidebar_settings_padding)
+
+        val lp = binding.btnBack.layoutParams
+        if (lp.width != sizePx || lp.height != sizePx) {
+            lp.width = sizePx
+            lp.height = sizePx
+            binding.btnBack.layoutParams = lp
+        }
+        if (
+            binding.btnBack.paddingLeft != padPx ||
+            binding.btnBack.paddingTop != padPx ||
+            binding.btnBack.paddingRight != padPx ||
+            binding.btnBack.paddingBottom != padPx
+        ) {
+            binding.btnBack.setPadding(padPx, padPx, padPx, padPx)
+        }
+    }
+
     override fun onDestroy() {
         ActivityStackLimiter.unregister(group = ACTIVITY_STACK_GROUP, activity = this)
         super.onDestroy()
@@ -198,6 +228,7 @@ class UpDetailActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
+        applyUiMode()
         adapter.setTvMode(TvMode.isEnabled(this))
         (binding.recycler.layoutManager as? GridLayoutManager)?.spanCount = spanCountForWidth()
         if (!binding.swipeRefresh.isRefreshing && adapter.itemCount == 0) {

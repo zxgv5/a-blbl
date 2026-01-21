@@ -24,6 +24,7 @@ import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.core.ui.Immersive
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.core.ui.SingleChoiceDialog
 import blbl.cat3399.core.update.TestApkUpdater
 import blbl.cat3399.databinding.ActivitySettingsBinding
@@ -41,6 +42,7 @@ import okhttp3.Cookie
 import java.io.File
 import java.util.ArrayDeque
 import java.util.Locale
+import kotlin.math.roundToInt
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySettingsBinding
@@ -160,6 +162,36 @@ class SettingsActivity : AppCompatActivity() {
         if (lp.width != widthPx) {
             lp.width = widthPx
             binding.recyclerLeft.layoutParams = lp
+        }
+
+        val sidebarScale =
+            (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
+        fun px(id: Int): Int = resources.getDimensionPixelSize(id)
+        fun scaledPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
+
+        val backSizePx =
+            scaledPx(
+                if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_size_tv else blbl.cat3399.R.dimen.sidebar_settings_size,
+            ).coerceAtLeast(1)
+        val backPadPx =
+            scaledPx(
+                if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_padding_tv else blbl.cat3399.R.dimen.sidebar_settings_padding,
+            )
+
+        val backLp = binding.btnBack.layoutParams
+        if (backLp.width != backSizePx || backLp.height != backSizePx) {
+            backLp.width = backSizePx
+            backLp.height = backSizePx
+            binding.btnBack.layoutParams = backLp
+        }
+        if (
+            binding.btnBack.paddingLeft != backPadPx ||
+            binding.btnBack.paddingTop != backPadPx ||
+            binding.btnBack.paddingRight != backPadPx ||
+            binding.btnBack.paddingBottom != backPadPx
+        ) {
+            binding.btnBack.setPadding(backPadPx, backPadPx, backPadPx, backPadPx)
         }
     }
 

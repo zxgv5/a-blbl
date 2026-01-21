@@ -16,7 +16,9 @@ import androidx.recyclerview.widget.SimpleItemAnimator
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.R
+import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.tv.TvMode
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.databinding.FragmentMyFavFolderDetailBinding
 import blbl.cat3399.feature.following.openUpDetailFromVideoCard
 import blbl.cat3399.feature.player.PlayerActivity
@@ -25,6 +27,7 @@ import blbl.cat3399.feature.player.PlayerPlaylistStore
 import blbl.cat3399.feature.video.VideoCardAdapter
 import blbl.cat3399.ui.RefreshKeyHandler
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class MyFavFolderDetailFragment : Fragment(), RefreshKeyHandler {
     private var _binding: FragmentMyFavFolderDetailBinding? = null
@@ -211,8 +214,36 @@ class MyFavFolderDetailFragment : Fragment(), RefreshKeyHandler {
 
     override fun onResume() {
         super.onResume()
+        applyBackButtonSizing()
         if (this::adapter.isInitialized) adapter.setTvMode(TvMode.isEnabled(requireContext()))
         (binding.recycler.layoutManager as? GridLayoutManager)?.spanCount = spanCountForWidth(resources)
+    }
+
+    private fun applyBackButtonSizing() {
+        val tvMode = TvMode.isEnabled(requireContext())
+        val sidebarScale =
+            (UiScale.factor(requireContext(), tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
+        fun px(id: Int): Int = resources.getDimensionPixelSize(id)
+        fun scaledPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
+
+        val sizePx = scaledPx(if (tvMode) R.dimen.sidebar_settings_size_tv else R.dimen.sidebar_settings_size).coerceAtLeast(1)
+        val padPx = scaledPx(if (tvMode) R.dimen.sidebar_settings_padding_tv else R.dimen.sidebar_settings_padding)
+
+        val lp = binding.btnBack.layoutParams
+        if (lp.width != sizePx || lp.height != sizePx) {
+            lp.width = sizePx
+            lp.height = sizePx
+            binding.btnBack.layoutParams = lp
+        }
+        if (
+            binding.btnBack.paddingLeft != padPx ||
+            binding.btnBack.paddingTop != padPx ||
+            binding.btnBack.paddingRight != padPx ||
+            binding.btnBack.paddingBottom != padPx
+        ) {
+            binding.btnBack.setPadding(padPx, padPx, padPx, padPx)
+        }
     }
 
     override fun handleRefreshKey(): Boolean {

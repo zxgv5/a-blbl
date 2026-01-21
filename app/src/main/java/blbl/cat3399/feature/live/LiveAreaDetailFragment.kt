@@ -5,7 +5,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import blbl.cat3399.core.net.BiliClient
+import blbl.cat3399.core.tv.TvMode
+import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.databinding.FragmentLiveAreaDetailBinding
+import kotlin.math.roundToInt
 
 class LiveAreaDetailFragment : Fragment() {
     private var _binding: FragmentLiveAreaDetailBinding? = null
@@ -30,6 +34,7 @@ class LiveAreaDetailFragment : Fragment() {
                 parentTitle == areaTitle -> areaTitle
                 else -> "$parentTitle · $areaTitle"
             }
+        applyBackButtonSizing()
 
         if (savedInstanceState == null) {
             childFragmentManager.beginTransaction()
@@ -60,6 +65,41 @@ class LiveAreaDetailFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyBackButtonSizing()
+    }
+
+    private fun applyBackButtonSizing() {
+        val b = _binding ?: return
+        val tvMode = TvMode.isEnabled(requireContext())
+        val sidebarScale =
+            (UiScale.factor(requireContext(), tvMode, BiliClient.prefs.sidebarSize) * if (tvMode) 1.0f else 1.20f)
+                .coerceIn(0.60f, 1.40f)
+        fun px(id: Int): Int = b.root.resources.getDimensionPixelSize(id)
+        fun scaledPx(id: Int): Int = (px(id) * sidebarScale).roundToInt().coerceAtLeast(0)
+
+        val sizePx =
+            scaledPx(if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_size_tv else blbl.cat3399.R.dimen.sidebar_settings_size).coerceAtLeast(1)
+        val padPx =
+            scaledPx(if (tvMode) blbl.cat3399.R.dimen.sidebar_settings_padding_tv else blbl.cat3399.R.dimen.sidebar_settings_padding)
+
+        val lp = b.btnBack.layoutParams
+        if (lp.width != sizePx || lp.height != sizePx) {
+            lp.width = sizePx
+            lp.height = sizePx
+            b.btnBack.layoutParams = lp
+        }
+        if (
+            b.btnBack.paddingLeft != padPx ||
+            b.btnBack.paddingTop != padPx ||
+            b.btnBack.paddingRight != padPx ||
+            b.btnBack.paddingBottom != padPx
+        ) {
+            b.btnBack.setPadding(padPx, padPx, padPx, padPx)
+        }
     }
 
     companion object {
