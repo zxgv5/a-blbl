@@ -28,6 +28,7 @@ import blbl.cat3399.core.ui.SingleChoiceDialog
 import blbl.cat3399.core.ui.UiScale
 import blbl.cat3399.databinding.ActivityPlayerBinding
 import blbl.cat3399.databinding.DialogLiveChatBinding
+import blbl.cat3399.feature.player.PlayerContentAutoScale
 import blbl.cat3399.feature.player.PlayerOsdSizing
 import blbl.cat3399.feature.player.PlayerSettingsAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -69,6 +70,15 @@ class LivePlayerActivity : AppCompatActivity() {
         setContentView(binding.root)
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
         applyUiMode()
+
+        // Re-apply after layout changes so content-based auto-scale can take effect.
+        binding.playerView.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
+            val w = r - l
+            val h = b - t
+            val ow = or - ol
+            val oh = ob - ot
+            if (w != ow || h != oh) applyUiMode()
+        }
 
         roomId = intent.getLongExtra(EXTRA_ROOM_ID, 0L)
         roomTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -179,7 +189,12 @@ class LivePlayerActivity : AppCompatActivity() {
 
     private fun applyUiMode() {
         val tvMode = TvMode.isEnabled(this)
-        val uiScale = UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize)
+        val density = resources.displayMetrics.density
+        val autoScale = if (tvMode) 1.0f else PlayerContentAutoScale.factor(binding.playerView, density)
+
+        val uiScale =
+            (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * autoScale)
+                .coerceIn(0.80f, 1.45f)
 
         fun px(id: Int): Int = resources.getDimensionPixelSize(id)
         fun pxF(id: Int): Float = resources.getDimension(id)
@@ -267,7 +282,7 @@ class LivePlayerActivity : AppCompatActivity() {
             }
         }
 
-        PlayerOsdSizing.applyToViews(this, binding)
+        PlayerOsdSizing.applyToViews(this, binding, scale = autoScale)
 
         binding.tvTime.setTextSize(
             TypedValue.COMPLEX_UNIT_PX,

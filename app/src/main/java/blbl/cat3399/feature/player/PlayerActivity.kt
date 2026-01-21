@@ -221,6 +221,15 @@ class PlayerActivity : AppCompatActivity() {
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
         applyUiMode()
 
+        // Re-apply after layout changes so content-based auto-scale can take effect.
+        binding.playerView.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
+            val w = r - l
+            val h = b - t
+            val ow = or - ol
+            val oh = ob - ot
+            if (w != ow || h != oh) applyUiMode()
+        }
+
         binding.topBar.visibility = View.GONE
         binding.bottomBar.visibility = View.GONE
         binding.progressPersistentBottom.max = SEEK_MAX
@@ -3854,7 +3863,13 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun applyUiMode() {
         val tvMode = TvMode.isEnabled(this)
-        val uiScale = UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize)
+        val density = resources.displayMetrics.density
+        val autoScale = if (tvMode) 1.0f else PlayerContentAutoScale.factor(binding.playerView, density)
+
+        // Use UiScale for user preference (S/M/L) and TV density fix; apply autoScale only in normal mode.
+        val uiScale =
+            (UiScale.factor(this, tvMode, BiliClient.prefs.sidebarSize) * autoScale)
+                .coerceIn(0.80f, 1.45f)
 
         fun px(id: Int): Int = resources.getDimensionPixelSize(id)
         fun pxF(id: Int): Float = resources.getDimension(id)
@@ -3956,7 +3971,8 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        PlayerOsdSizing.applyToViews(this, binding)
+        // OSD tier already comes from prefs via theme overlay; only apply autoScale here.
+        PlayerOsdSizing.applyToViews(this, binding, scale = autoScale)
 
         binding.tvTime.setTextSize(
             TypedValue.COMPLEX_UNIT_PX,

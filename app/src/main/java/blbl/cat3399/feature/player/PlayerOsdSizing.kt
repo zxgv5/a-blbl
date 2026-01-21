@@ -9,6 +9,7 @@ import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.prefs.AppPrefs
 import blbl.cat3399.core.tv.TvMode
 import blbl.cat3399.databinding.ActivityPlayerBinding
+import kotlin.math.roundToInt
 
 object PlayerOsdSizing {
     private enum class SizeTier {
@@ -37,12 +38,15 @@ object PlayerOsdSizing {
         activity.theme.applyStyle(overlay, true)
     }
 
-    fun applyToViews(activity: Activity, binding: ActivityPlayerBinding) {
-        val targetSize = activity.themeDimenPx(R.attr.playerOsdButtonTargetSize).coerceAtLeast(1)
-        val padTransport = activity.themeDimenPx(R.attr.playerOsdPadTransport).coerceAtLeast(0)
-        val padNormal = activity.themeDimenPx(R.attr.playerOsdPadNormal).coerceAtLeast(0)
-        val padSmall = activity.themeDimenPx(R.attr.playerOsdPadSmall).coerceAtLeast(0)
-        val gap = activity.themeDimenPx(R.attr.playerOsdGap).coerceAtLeast(0)
+    fun applyToViews(activity: Activity, binding: ActivityPlayerBinding, scale: Float = 1.0f) {
+        val s = scale.takeIf { it.isFinite() && it > 0f } ?: 1.0f
+        fun scaled(v: Int): Int = (v * s).roundToInt()
+
+        val targetSize = scaled(activity.themeDimenPx(R.attr.playerOsdButtonTargetSize)).coerceAtLeast(1)
+        val padTransport = scaled(activity.themeDimenPx(R.attr.playerOsdPadTransport)).coerceAtLeast(0)
+        val padNormal = scaled(activity.themeDimenPx(R.attr.playerOsdPadNormal)).coerceAtLeast(0)
+        val padSmall = scaled(activity.themeDimenPx(R.attr.playerOsdPadSmall)).coerceAtLeast(0)
+        val gap = scaled(activity.themeDimenPx(R.attr.playerOsdGap)).coerceAtLeast(0)
 
         listOf(binding.btnPrev, binding.btnPlayPause, binding.btnNext).forEach { btn ->
             setSize(btn, targetSize, targetSize)

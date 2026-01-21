@@ -62,6 +62,12 @@ class MainActivity : AppCompatActivity() {
     private var userInfoLoadJob: Job? = null
     private var lastBackAtMs: Long = 0L
 
+    private fun sidebarBaselineScale(tvMode: Boolean): Float {
+        // "界面大小" (prefs.sidebarSize) is a global UI scaler used by video cards/player.
+        // Keep its S/M/L multipliers unchanged, but make the sidebar baseline slightly larger in normal mode only.
+        return if (tvMode) 1.0f else 1.20f
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         needForceInitialSidebarFocus = savedInstanceState == null
@@ -508,8 +514,9 @@ class MainActivity : AppCompatActivity() {
     private fun applyUiMode() {
         val tvMode = TvMode.isEnabled(this)
         val sizePref = BiliClient.prefs.sidebarSize
-        val sidebarScale = UiScale.factor(this, tvMode, sizePref)
-        val sidebarWidthScale = UiScale.densityFixFactor(this, tvMode)
+        val baseline = sidebarBaselineScale(tvMode)
+        val sidebarScale = (UiScale.factor(this, tvMode, sizePref) * baseline).coerceIn(0.60f, 1.40f)
+        val sidebarWidthScale = (UiScale.densityFixFactor(this, tvMode) * baseline).coerceIn(0.60f, 1.40f)
         if (::navAdapter.isInitialized) {
             navAdapter.setTvMode(tvMode)
             navAdapter.setSidebarScale(sidebarScale)
