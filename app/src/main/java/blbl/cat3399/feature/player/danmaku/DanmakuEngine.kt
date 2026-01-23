@@ -90,9 +90,6 @@ class DanmakuEngine {
         if (drop <= 0) return
         danmakus = danmakus.drop(drop).toMutableList()
         index = (index - drop).coerceAtLeast(0)
-        active.clear()
-        pending.clear()
-        lastNowMs = 0
     }
 
     fun trimToTimeRange(minTimeMs: Int, maxTimeMs: Int) {
