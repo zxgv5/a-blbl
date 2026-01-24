@@ -173,7 +173,7 @@ class SettingsActivity : BaseActivity() {
 
     private fun applyUiMode() {
         val uiScale = UiScale.factor(this, BiliClient.prefs.sidebarSize)
-        val widthPx = (dp(320f) * uiScale).roundToInt().coerceAtLeast(1)
+        val widthPx = (dp(360f) * uiScale).roundToInt().coerceAtLeast(1)
         val lp = binding.recyclerLeft.layoutParams
         if (lp.width != widthPx) {
             lp.width = widthPx
