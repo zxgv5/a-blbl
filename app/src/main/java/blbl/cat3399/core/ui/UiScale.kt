@@ -7,7 +7,7 @@ import blbl.cat3399.core.prefs.AppPrefs
 
 object UiScale {
     // Baseline chosen from a known-good TV layout:
-    // 1920x1080 with screen scale shown as x1.50 in "设备信息 -> 屏幕".
+    // 1920x1080 with screen scale shown as 1.5x in "设备信息 -> 屏幕".
     const val BASELINE_DENSITY = 1.5f
     const val BASELINE_SHORT_SIDE_PX = 1080f
 

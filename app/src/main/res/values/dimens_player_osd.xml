@@ -2,7 +2,7 @@
 <resources>
     <!--
       Player bottom OSD: baseline is Medium; Small/Large are Medium x 0.9 / x 1.1.
-      Baseline tuning target: 1920x1080 with screen scale shown as x1.50 in "设备信息 -> 屏幕".
+      Baseline tuning target: 1920x1080 with screen scale shown as 1.5x in "设备信息 -> 屏幕".
     -->
 
     <!-- Focus target size (all buttons) -->

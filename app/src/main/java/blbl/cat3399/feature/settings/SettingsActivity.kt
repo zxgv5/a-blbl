@@ -1336,19 +1336,23 @@ class SettingsActivity : BaseActivity() {
 
         val sysDm = Resources.getSystem().displayMetrics
         val sysScale = sysDm.density
-        val uiScale = uiDm.density
+        val scaleText =
+            if (sysScale.isFinite() && sysScale > 0f) {
+                val x100 = (sysScale * 100f).roundToInt().toFloat() / 100f
+                val x10 = (x100 * 10f).roundToInt().toFloat() / 10f
+                val show =
+                    when {
+                        kotlin.math.abs(x100 - x100.toInt()) < 0.001f -> x100.toInt().toString()
+                        kotlin.math.abs(x100 - x10) < 0.001f -> String.format(Locale.US, "%.1f", x100)
+                        else -> String.format(Locale.US, "%.2f", x100)
+                    }
+                "${show}x"
+            } else {
+                "-"
+            }
 
-        val refreshHz =
-            runCatching {
-                @Suppress("DEPRECATION")
-                windowManager.defaultDisplay.refreshRate
-            }.getOrNull() ?: 0f
-
-        val hzText = if (refreshHz > 0f) String.format(Locale.US, "%.0fHz", refreshHz) else "-"
-        val sysText = String.format(Locale.US, "sys x%.2f(%ddpi)", sysScale, sysDm.densityDpi)
-        val uiText = String.format(Locale.US, "ui x%.2f(%ddpi)", uiScale, uiDm.densityDpi)
-        val factorText = String.format(Locale.US, "f x%.2f", UiScale.deviceFactor(this))
-        return "${width}×${height} ${hzText} ${sysText} ${uiText} ${factorText}"
+        // Settings -> Device Info -> Screen: show only resolution + system display scaling.
+        return "${width}x${height} $scaleText"
     }
 
     private fun ramText(): String {
