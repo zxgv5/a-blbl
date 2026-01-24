@@ -14,6 +14,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.R as AppCompatR
 
 object SingleChoiceDialog {
+    private const val DESIRED_VISIBLE_ROWS = 7
+    private const val MAX_DIALOG_HEIGHT_RATIO = 0.90f
+
     fun show(
         context: Context,
         title: String,
@@ -53,14 +56,6 @@ object SingleChoiceDialog {
                 },
             )
         recycler.adapter = adapter
-        if (items.size > 8) {
-            val maxHeight = (context.resources.displayMetrics.heightPixels * 0.62f).toInt()
-            val lp =
-                recycler.layoutParams
-                    ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lp.height = maxHeight
-            recycler.layoutParams = lp
-        }
 
         val dialog =
             MaterialAlertDialogBuilder(context)
@@ -83,13 +78,12 @@ object SingleChoiceDialog {
             dialog.findViewById<View>(AppCompatR.id.customPanel)?.setPadding(0, 0, 0, 0)
 
             // Avoid overly wide dialogs on large screens (e.g. TV), which makes the list feel sparse.
-            val maxWidthPx = dp(context, 520f)
+            val maxWidthPx = dp(context, 600f)
             val targetWidthPx = (context.resources.displayMetrics.widthPixels * 0.90f).toInt().coerceAtMost(maxWidthPx)
             dialog.window?.setLayout(targetWidthPx, ViewGroup.LayoutParams.WRAP_CONTENT)
 
             recycler.post {
-                recycler.scrollToPosition(safeChecked)
-                (recycler.findViewHolderForAdapterPosition(safeChecked)?.itemView ?: recycler.getChildAt(0))?.requestFocus()
+                applyDesiredListHeight(context, dialog, recycler, itemCount = items.size, targetWidthPx = targetWidthPx, checkedIndex = safeChecked)
             }
         }
         dialog.show()
@@ -97,6 +91,67 @@ object SingleChoiceDialog {
 
     private fun dp(context: Context, value: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics).toInt()
+
+    private fun applyDesiredListHeight(
+        context: Context,
+        dialog: android.app.Dialog,
+        recycler: RecyclerView,
+        itemCount: Int,
+        targetWidthPx: Int,
+        checkedIndex: Int,
+    ) {
+        val count = itemCount.coerceAtLeast(0)
+        if (count <= 0) return
+        val rows = DESIRED_VISIBLE_ROWS.coerceAtLeast(1).coerceAtMost(count)
+
+        val dm = context.resources.displayMetrics
+        val maxDialogHeightPx = (dm.heightPixels * MAX_DIALOG_HEIGHT_RATIO).toInt().coerceAtLeast(1)
+
+        val child = recycler.getChildAt(0)
+        val childLp = child?.layoutParams as? ViewGroup.MarginLayoutParams
+        val measuredRowHeightPx =
+            child
+                ?.height
+                ?.takeIf { it > 0 }
+                ?.let { it + (childLp?.topMargin ?: 0) + (childLp?.bottomMargin ?: 0) }
+
+        // If child is not ready yet, retry once more on the next frame.
+        if (measuredRowHeightPx == null) {
+            recycler.post {
+                applyDesiredListHeight(
+                    context = context,
+                    dialog = dialog,
+                    recycler = recycler,
+                    itemCount = itemCount,
+                    targetWidthPx = targetWidthPx,
+                    checkedIndex = checkedIndex,
+                )
+            }
+            return
+        }
+
+        val rowHeightPx = measuredRowHeightPx.coerceAtLeast(1)
+        val desiredListHeightPx = (rowHeightPx * rows) + recycler.paddingTop + recycler.paddingBottom
+
+        val lp =
+            recycler.layoutParams
+                ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        if (lp.height != desiredListHeightPx) {
+            lp.height = desiredListHeightPx
+            recycler.layoutParams = lp
+        }
+
+        // Dialog window size is decided at show-time. After we change list height, force the window
+        // to re-layout so the dialog can actually grow (otherwise you may still see only ~3 rows).
+        val currentWindowHeight = dialog.window?.decorView?.height ?: 0
+        val currentListHeight = recycler.height.takeIf { it > 0 } ?: 0
+        val nonListHeight = (currentWindowHeight - currentListHeight).coerceAtLeast(0)
+        val desiredWindowHeight = (nonListHeight + desiredListHeightPx).coerceAtMost(maxDialogHeightPx).coerceAtLeast(1)
+        dialog.window?.setLayout(targetWidthPx, desiredWindowHeight)
+
+        recycler.scrollToPosition(checkedIndex)
+        (recycler.findViewHolderForAdapterPosition(checkedIndex)?.itemView ?: recycler.getChildAt(0))?.requestFocus()
+    }
 
     private class Adapter(
         private val items: List<String>,

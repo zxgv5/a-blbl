@@ -6,4 +6,4 @@
     android:clipChildren="false"
     android:clipToPadding="false"
     android:overScrollMode="never"
-    android:padding="10dp" />
+    android:padding="16dp" />
