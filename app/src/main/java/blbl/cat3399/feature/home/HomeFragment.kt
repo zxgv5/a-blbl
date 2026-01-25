@@ -93,6 +93,13 @@ class HomeFragment : Fragment(), VideoGridTabSwitchFocusHost, BackPressHandler {
     override fun handleBackPressed(): Boolean {
         val b = _binding ?: return false
         if (b.viewPager.currentItem == 0) return false
+        if (b.viewPager.hasFocus() && !b.tabLayout.hasFocus()) {
+            val tabStrip = b.tabLayout.getChildAt(0) as? ViewGroup ?: return false
+            val pos = b.tabLayout.selectedTabPosition.takeIf { it >= 0 } ?: b.viewPager.currentItem
+            b.tabLayout.post { tabStrip.getChildAt(pos)?.requestFocus() }
+            return true
+        }
+
         pendingFocusFirstCardFromContentSwitch = true
         b.viewPager.setCurrentItem(0, true)
         return true
