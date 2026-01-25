@@ -79,14 +79,14 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     private var currentVideoOrder: VideoOrder = VideoOrder.TotalRank
     private var currentLiveOrder: LiveOrder = LiveOrder.Online
     private var currentUserOrder: UserOrder = UserOrder.Default
-    private var currentMediaKind: MediaKind = MediaKind.Ft
     private var pendingFocusFirstResultCardFromTabSwitch: Boolean = false
     private var pendingFocusNextResultCardAfterLoadMoreFromDpad: Boolean = false
     private var pendingFocusNextResultCardAfterLoadMoreFromPos: Int = RecyclerView.NO_POSITION
     private var pendingRestoreMediaPos: Int? = null
 
     private val loadedBvids = HashSet<String>()
-    private val loadedSeasonIds = HashSet<Long>()
+    private val loadedBangumiSeasonIds = HashSet<Long>()
+    private val loadedMediaSeasonIds = HashSet<Long>()
     private val loadedRoomIds = HashSet<Long>()
     private val loadedMids = HashSet<Long>()
 
@@ -98,6 +98,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     )
 
     private val videoState = TabState()
+    private val bangumiState = TabState()
     private val mediaState = TabState()
     private val liveState = TabState()
     private val userState = TabState()
@@ -595,6 +596,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
 
         binding.tabLayout.removeAllTabs()
         binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.search_tab_video))
+	        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.search_tab_bangumi))
 	        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.search_tab_media))
 	        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.search_tab_live))
 	        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.search_tab_user))
@@ -1011,19 +1013,31 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                         AppLog.i("Search", "load ok tab=video add=${filtered.size} total=${videoAdapter.itemCount} cost=${SystemClock.uptimeMillis() - startAt}ms")
                     }
 
-                    Tab.Media -> {
-                        val res =
-                            when (currentMediaKind) {
-                                MediaKind.Ft -> BiliApi.searchMediaFt(keyword = keyword, page = state.page, order = "totalrank")
-                                MediaKind.Bangumi -> BiliApi.searchMediaBangumi(keyword = keyword, page = state.page, order = "totalrank")
-                            }
+                    Tab.Bangumi -> {
+                        val res = BiliApi.searchMediaBangumi(keyword = keyword, page = state.page, order = "totalrank")
                         if (token != state.requestToken || currentTabIndex != tab.index) return@launch
                         val list = res.items
                         if (list.isEmpty()) {
                             state.endReached = true
                             return@launch
                         }
-                        val filtered = list.filter { loadedSeasonIds.add(it.seasonId) }
+                        val filtered = list.filter { loadedBangumiSeasonIds.add(it.seasonId) }
+                        if (state.page == 1) mediaAdapter.submit(filtered) else mediaAdapter.append(filtered)
+                        state.page++
+                        if (res.pages in 1..state.page && state.page > res.pages) state.endReached = true
+                        if (filtered.isEmpty()) state.endReached = true
+                        AppLog.i("Search", "load ok tab=bangumi add=${filtered.size} cost=${SystemClock.uptimeMillis() - startAt}ms")
+                    }
+
+                    Tab.Media -> {
+                        val res = BiliApi.searchMediaFt(keyword = keyword, page = state.page, order = "totalrank")
+                        if (token != state.requestToken || currentTabIndex != tab.index) return@launch
+                        val list = res.items
+                        if (list.isEmpty()) {
+                            state.endReached = true
+                            return@launch
+                        }
+                        val filtered = list.filter { loadedMediaSeasonIds.add(it.seasonId) }
                         if (state.page == 1) mediaAdapter.submit(filtered) else mediaAdapter.append(filtered)
                         state.page++
                         if (res.pages in 1..state.page && state.page > res.pages) state.endReached = true
@@ -1169,6 +1183,8 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                 }
             }
 
+            Tab.Bangumi, Tab.Media -> Unit
+
             Tab.Live -> {
                 val items = LiveOrder.entries
                 val labels = items.map { getString(it.labelRes) }
@@ -1203,26 +1219,6 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                     val picked = items.getOrNull(which) ?: return@show
                     if (picked != currentUserOrder) {
                         currentUserOrder = picked
-                        updateSortUi()
-                        resetAndLoad()
-                    }
-                }
-            }
-
-            Tab.Media -> {
-                val items = MediaKind.entries
-                val labels = items.map { getString(it.labelRes) }
-                val checked = items.indexOf(currentMediaKind).coerceAtLeast(0)
-                SingleChoiceDialog.show(
-                    context = requireContext(),
-                    title = getString(R.string.search_sort_title),
-                    items = labels,
-                    checkedIndex = checked,
-                    negativeText = getString(android.R.string.cancel),
-                ) { which, _ ->
-                    val picked = items.getOrNull(which) ?: return@show
-                    if (picked != currentMediaKind) {
-                        currentMediaKind = picked
                         updateSortUi()
                         resetAndLoad()
                     }
@@ -1272,7 +1268,8 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
         pendingRestoreMediaPos = null
         if (!isResumed) return
         if (_binding == null) return
-        if (currentTabIndex != Tab.Media.index) return
+        val tab = tabForIndex(currentTabIndex)
+        if (tab != Tab.Bangumi && tab != Tab.Media) return
         if (binding.panelResults.visibility != View.VISIBLE) return
         val adapter = binding.recyclerResults.adapter ?: return
         if (adapter.itemCount <= 0) return
@@ -1488,19 +1485,12 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
         Level("level", R.string.search_sort_user_level),
     }
 
-    enum class MediaKind(
-        val searchType: String,
-        val labelRes: Int,
-    ) {
-        Ft("media_ft", R.string.search_media_ft),
-        Bangumi("media_bangumi", R.string.search_media_bangumi),
-    }
-
     private enum class Tab(val index: Int) {
         Video(0),
-        Media(1),
-        Live(2),
-        User(3),
+        Bangumi(1),
+        Media(2),
+        Live(3),
+        User(4),
     }
 
     companion object {
@@ -1520,6 +1510,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     private fun tabForIndex(index: Int): Tab =
         when (index) {
             Tab.Video.index -> Tab.Video
+            Tab.Bangumi.index -> Tab.Bangumi
             Tab.Media.index -> Tab.Media
             Tab.Live.index -> Tab.Live
             Tab.User.index -> Tab.User
@@ -1529,6 +1520,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     private fun stateForTab(index: Int): TabState =
         when (tabForIndex(index)) {
             Tab.Video -> videoState
+            Tab.Bangumi -> bangumiState
             Tab.Media -> mediaState
             Tab.Live -> liveState
             Tab.User -> userState
@@ -1537,6 +1529,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     private fun adapterForTab(index: Int): RecyclerView.Adapter<*> =
         when (tabForIndex(index)) {
             Tab.Video -> videoAdapter
+            Tab.Bangumi -> mediaAdapter
             Tab.Media -> mediaAdapter
             Tab.Live -> liveAdapter
             Tab.User -> userAdapter
@@ -1544,7 +1537,7 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
 
     private fun spanCountForTab(index: Int): Int =
         when (tabForIndex(index)) {
-            Tab.Media -> spanCountForBangumi()
+            Tab.Bangumi, Tab.Media -> spanCountForBangumi()
             else -> spanCountForWidth()
         }
 
@@ -1561,8 +1554,13 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                 videoAdapter.submit(emptyList())
             }
 
+            Tab.Bangumi -> {
+                loadedBangumiSeasonIds.clear()
+                mediaAdapter.submit(emptyList())
+            }
+
             Tab.Media -> {
-                loadedSeasonIds.clear()
+                loadedMediaSeasonIds.clear()
                 mediaAdapter.submit(emptyList())
             }
 
@@ -1586,6 +1584,11 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                 b.tvSort.text = getString(currentVideoOrder.labelRes)
             }
 
+            Tab.Bangumi, Tab.Media -> {
+                // Keep layout space so TabLayout width doesn't jump across tabs.
+                b.btnSort.visibility = View.INVISIBLE
+            }
+
             Tab.Live -> {
                 b.btnSort.visibility = View.VISIBLE
                 b.tvSort.text = getString(currentLiveOrder.labelRes)
@@ -1595,17 +1598,12 @@ class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
                 b.btnSort.visibility = View.VISIBLE
                 b.tvSort.text = getString(currentUserOrder.labelRes)
             }
-
-            Tab.Media -> {
-                b.btnSort.visibility = View.VISIBLE
-                b.tvSort.text = getString(currentMediaKind.labelRes)
-            }
         }
     }
 
     private fun openBangumiDetail(season: BangumiSeason) {
         if (!isAdded || parentFragmentManager.isStateSaved) return
-        val isDrama = currentMediaKind == MediaKind.Ft
+        val isDrama = tabForIndex(currentTabIndex) == Tab.Media
         // Use add+hide instead of replace so SearchFragment's view state (results panel, scroll, focus)
         // is preserved when returning from the detail page, matching the behavior of activity navigations.
         parentFragmentManager.beginTransaction()
