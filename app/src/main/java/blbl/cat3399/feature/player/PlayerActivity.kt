@@ -1697,8 +1697,14 @@ class PlayerActivity : BaseActivity() {
             }
 
             KeyEvent.KEYCODE_BACK -> {
-                cancelPendingAutoResume(reason = "back")
-                cancelPendingAutoSkip(reason = "back", markIgnored = true)
+                val cancelledAutoResume = autoResumeHintVisible
+                val cancelledAutoSkip = autoSkipHintVisible || autoSkipPending != null
+                if (cancelledAutoResume) cancelPendingAutoResume(reason = "back")
+                if (cancelledAutoSkip) cancelPendingAutoSkip(reason = "back", markIgnored = true)
+                if (cancelledAutoResume || cancelledAutoSkip) {
+                    finishOnBackKeyUp = false
+                    return true
+                }
                 finishOnBackKeyUp = false
                 if (binding.settingsPanel.visibility == View.VISIBLE) {
                     binding.settingsPanel.visibility = View.GONE
@@ -2388,13 +2394,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun shouldFinishOnBackPress(): Boolean {
-        val exo = player
-        if (exo != null &&
-            exo.playbackState == Player.STATE_ENDED &&
-            !BiliClient.prefs.playerDoubleBackOnEnded
-        ) {
-            return true
-        }
+        if (!BiliClient.prefs.playerDoubleBackToExit) return true
         val now = SystemClock.uptimeMillis()
         val isSecond = now - lastBackAtMs <= BACK_DOUBLE_PRESS_WINDOW_MS
         if (isSecond) return true

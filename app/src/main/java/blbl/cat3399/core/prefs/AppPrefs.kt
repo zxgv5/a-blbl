@@ -150,9 +150,9 @@ class AppPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_PLAYER_DEBUG, false)
         set(value) = prefs.edit().putBoolean(KEY_PLAYER_DEBUG, value).apply()
 
-    var playerDoubleBackOnEnded: Boolean
-        get() = prefs.getBoolean(KEY_PLAYER_DOUBLE_BACK_ON_ENDED, true)
-        set(value) = prefs.edit().putBoolean(KEY_PLAYER_DOUBLE_BACK_ON_ENDED, value).apply()
+    var playerDoubleBackToExit: Boolean
+        get() = prefs.getBoolean(KEY_PLAYER_DOUBLE_BACK_TO_EXIT, true)
+        set(value) = prefs.edit().putBoolean(KEY_PLAYER_DOUBLE_BACK_TO_EXIT, value).apply()
 
     var playerPersistentBottomProgressEnabled: Boolean
         get() = prefs.getBoolean(KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS, false)
@@ -294,7 +294,7 @@ class AppPrefs(context: Context) {
         private const val KEY_PLAYER_OPEN_DETAIL_BEFORE_PLAY = "player_open_detail_before_play"
         private const val KEY_FULLSCREEN = "fullscreen_enabled"
         private const val KEY_PLAYER_DEBUG = "player_debug_enabled"
-        private const val KEY_PLAYER_DOUBLE_BACK_ON_ENDED = "player_double_back_on_ended"
+        private const val KEY_PLAYER_DOUBLE_BACK_TO_EXIT = "player_double_back_on_ended"
         private const val KEY_PLAYER_PERSISTENT_BOTTOM_PROGRESS = "player_persistent_bottom_progress"
         private const val KEY_PLAYER_PLAYBACK_MODE = "player_playback_mode"
         private const val KEY_PLAYER_ACTION_BUTTONS = "player_action_buttons"

@@ -278,7 +278,7 @@ class SettingsActivity : BaseActivity() {
                 SettingEntry("视频编码", prefs.playerPreferredCodec, null),
                 SettingEntry("控制栏按钮", playerActionButtonsText(prefs.playerActionButtons), null),
                 SettingEntry("显示视频调试信息", if (prefs.playerDebugEnabled) "开" else "关", null),
-                SettingEntry("播放结束双击返回", if (prefs.playerDoubleBackOnEnded) "开" else "关", null),
+                SettingEntry("按两次退出键才退出播放器", if (prefs.playerDoubleBackToExit) "开" else "关", null),
                 SettingEntry("底部常驻进度条", if (prefs.playerPersistentBottomProgressEnabled) "开" else "关", null),
             )
 
@@ -664,8 +664,8 @@ class SettingsActivity : BaseActivity() {
                 refreshSection(entry.title)
             }
 
-            "播放结束双击返回" -> {
-                prefs.playerDoubleBackOnEnded = !prefs.playerDoubleBackOnEnded
+            "按两次退出键才退出播放器" -> {
+                prefs.playerDoubleBackToExit = !prefs.playerDoubleBackToExit
                 refreshSection(entry.title)
             }
 

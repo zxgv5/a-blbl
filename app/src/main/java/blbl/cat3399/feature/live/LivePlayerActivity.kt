@@ -568,14 +568,7 @@ class LivePlayerActivity : BaseActivity() {
     }
 
     private fun shouldFinishOnBackPress(): Boolean {
-        val exo = player
-        if (
-            exo != null &&
-            exo.playbackState == Player.STATE_ENDED &&
-            !BiliClient.prefs.playerDoubleBackOnEnded
-        ) {
-            return true
-        }
+        if (!BiliClient.prefs.playerDoubleBackToExit) return true
         val now = SystemClock.uptimeMillis()
         val isSecond = now - lastBackAtMs <= BACK_DOUBLE_PRESS_WINDOW_MS
         if (isSecond) return true
