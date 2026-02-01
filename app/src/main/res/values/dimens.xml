@@ -206,6 +206,19 @@
     <dimen name="player_online_text_size">12sp</dimen>
     <dimen name="player_online_text_size_tv">16sp</dimen>
 
+    <dimen name="player_clock_margin_top">8dp</dimen>
+    <dimen name="player_clock_margin_top_tv">12dp</dimen>
+    <dimen name="player_clock_margin_start">10dp</dimen>
+    <dimen name="player_clock_margin_start_tv">14dp</dimen>
+    <dimen name="player_clock_margin_end">12dp</dimen>
+    <dimen name="player_clock_margin_end_tv">16dp</dimen>
+    <dimen name="player_clock_padding_h">10dp</dimen>
+    <dimen name="player_clock_padding_h_tv">14dp</dimen>
+    <dimen name="player_clock_padding_v">6dp</dimen>
+    <dimen name="player_clock_padding_v_tv">8dp</dimen>
+    <dimen name="player_clock_text_size">19sp</dimen>
+    <dimen name="player_clock_text_size_tv">24sp</dimen>
+
     <dimen name="player_title_meta_margin_top">2dp</dimen>
     <dimen name="player_title_meta_margin_top_tv">4dp</dimen>
     <dimen name="player_title_meta_padding_bottom">0dp</dimen>

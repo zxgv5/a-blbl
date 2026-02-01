@@ -258,6 +258,26 @@ class LivePlayerActivity : BaseActivity() {
             scaledPxF(blbl.cat3399.R.dimen.player_online_text_size_tv),
         )
 
+        binding.tvClock.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            scaledPxF(blbl.cat3399.R.dimen.player_clock_text_size_tv),
+        )
+        (binding.tvClock.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val me = scaledPx(blbl.cat3399.R.dimen.player_clock_margin_end_tv)
+            if (lp.topMargin != 0 || lp.marginEnd != me) {
+                lp.topMargin = 0
+                lp.marginEnd = me
+                binding.tvClock.layoutParams = lp
+            }
+        }
+        (binding.titleRow.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val me = scaledPx(blbl.cat3399.R.dimen.player_clock_margin_start_tv)
+            if (lp.marginEnd != me) {
+                lp.marginEnd = me
+                binding.titleRow.layoutParams = lp
+            }
+        }
+
         val bottomPadV = scaledPx(blbl.cat3399.R.dimen.player_bottom_bar_padding_v_tv)
         if (binding.bottomBar.paddingTop != bottomPadV || binding.bottomBar.paddingBottom != bottomPadV) {
             binding.bottomBar.setPadding(

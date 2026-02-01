@@ -10,15 +10,32 @@
         style="@style/Widget.Blbl.TabLayout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
         android:background="@color/blbl_bg"
         android:focusable="false"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/tv_clock"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:tabBackground="@drawable/blbl_focus_bg_round"
         app:tabIndicatorColor="@color/blbl_purple"
         app:tabSelectedTextColor="@color/blbl_text"
         app:tabTextColor="@color/blbl_text_secondary" />
+
+    <TextClock
+        android:id="@+id/tv_clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:format12Hour="HH:mm"
+        android:format24Hour="HH:mm"
+        android:gravity="center_vertical"
+        android:includeFontPadding="false"
+        android:textColor="@color/blbl_text"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@id/tab_layout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tab_layout" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/view_pager"

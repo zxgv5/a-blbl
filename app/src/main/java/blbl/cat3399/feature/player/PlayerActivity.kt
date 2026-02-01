@@ -4752,6 +4752,26 @@ class PlayerActivity : BaseActivity() {
             scaledPxF(R.dimen.player_online_text_size_tv),
         )
 
+        binding.tvClock.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            scaledPxF(R.dimen.player_clock_text_size_tv),
+        )
+        (binding.tvClock.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val me = scaledPx(R.dimen.player_clock_margin_end_tv)
+            if (lp.topMargin != 0 || lp.marginEnd != me) {
+                lp.topMargin = 0
+                lp.marginEnd = me
+                binding.tvClock.layoutParams = lp
+            }
+        }
+        (binding.titleRow.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val me = scaledPx(R.dimen.player_clock_margin_start_tv)
+            if (lp.marginEnd != me) {
+                lp.marginEnd = me
+                binding.titleRow.layoutParams = lp
+            }
+        }
+
         run {
             val ms = scaledPx(R.dimen.player_title_margin_start_tv)
             val me = scaledPx(R.dimen.player_title_margin_end_tv)
