@@ -1215,6 +1215,40 @@ class PlayerActivity : BaseActivity() {
 
                 requestOnlineWatchingText(bvid = resolvedBvid, cid = cid)
 
+                // Apply per-video default QN based on video orientation.
+                // See bilibili view API: data.dimension / pages[].dimension (width/height/rotate).
+                run {
+                    val prefs = BiliClient.prefs
+
+                    var dim: JSONObject? = null
+                    val pages = viewData.optJSONArray("pages")
+                    if (pages != null) {
+                        for (i in 0 until pages.length()) {
+                            val p = pages.optJSONObject(i) ?: continue
+                            if (p.optLong("cid") != cid) continue
+                            dim = p.optJSONObject("dimension")
+                            if (dim != null) break
+                        }
+                    }
+                    dim = dim ?: viewData.optJSONObject("dimension")
+
+                    val width = dim?.optInt("width", 0) ?: 0
+                    val height = dim?.optInt("height", 0) ?: 0
+                    val rotate = dim?.optInt("rotate", 0) ?: 0
+                    val (effectiveW, effectiveH) =
+                        if (rotate == 1) {
+                            height to width
+                        } else {
+                            width to height
+                        }
+
+                    val isPortraitVideo = (effectiveW > 0 && effectiveH > 0 && effectiveH > effectiveW)
+                    val preferredQn = if (isPortraitVideo) prefs.playerPreferredQnPortrait else prefs.playerPreferredQn
+                    if (session.preferredQn != preferredQn) {
+                        session = session.copy(preferredQn = preferredQn)
+                    }
+                }
+
                     val playJob =
                         async {
                             val (qn, fnval) = playUrlParamsForSession()

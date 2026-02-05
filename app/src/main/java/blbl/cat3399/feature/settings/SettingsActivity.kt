@@ -265,12 +265,13 @@ class SettingsActivity : BaseActivity() {
                 SettingEntry("以全屏模式运行", if (prefs.fullscreenEnabled) "开" else "关", null),
             )
 
-	            "播放设置" -> listOf(
-	                SettingEntry("默认画质", qnText(prefs.playerPreferredQn), null),
-	                SettingEntry("默认音轨", audioText(prefs.playerPreferredAudioId), null),
-	                SettingEntry("CDN线路", cdnText(prefs.playerCdnPreference), null),
-	                SettingEntry("默认播放速度", String.format(Locale.US, "%.2fx", prefs.playerSpeed), null),
-	                SettingEntry("长按快进倍率", String.format(Locale.US, "%.2fx", prefs.playerHoldSeekSpeed), null),
+		            "播放设置" -> listOf(
+		                SettingEntry("默认画质", qnText(prefs.playerPreferredQn), null),
+		                SettingEntry("默认画质（竖屏）", qnText(prefs.playerPreferredQnPortrait), null),
+		                SettingEntry("默认音轨", audioText(prefs.playerPreferredAudioId), null),
+		                SettingEntry("CDN线路", cdnText(prefs.playerCdnPreference), null),
+		                SettingEntry("默认播放速度", String.format(Locale.US, "%.2fx", prefs.playerSpeed), null),
+		                SettingEntry("长按快进倍率", String.format(Locale.US, "%.2fx", prefs.playerHoldSeekSpeed), null),
 	                SettingEntry("长按快进模式", holdSeekModeText(prefs.playerHoldSeekMode), null),
 	                SettingEntry("自动跳到上次播放位置", if (prefs.playerAutoResumeEnabled) "开" else "关", null),
 	                SettingEntry("自动跳过片段（空降助手）", if (prefs.playerAutoSkipSegmentsEnabled) "开" else "关", null),
@@ -279,7 +280,7 @@ class SettingsActivity : BaseActivity() {
 	                SettingEntry("字幕语言", subtitleLangText(prefs.subtitlePreferredLang), null),
 	                SettingEntry("默认开启字幕", if (prefs.subtitleEnabledDefault) "开" else "关", null),
 	                SettingEntry("视频编码", prefs.playerPreferredCodec, null),
-                SettingEntry("控制栏按钮", playerActionButtonsText(prefs.playerActionButtons), null),
+                SettingEntry("点赞投币收藏是否显示", playerActionButtonsText(prefs.playerActionButtons), null),
                 SettingEntry("显示视频调试信息", if (prefs.playerDebugEnabled) "开" else "关", null),
                 SettingEntry("按两次退出键才退出播放器", if (prefs.playerDoubleBackToExit) "开" else "关", null),
                 SettingEntry("底部常驻进度条", if (prefs.playerPersistentBottomProgressEnabled) "开" else "关", null),
@@ -577,6 +578,20 @@ class SettingsActivity : BaseActivity() {
                 }
             }
 
+            "默认画质（竖屏）" -> {
+                val options =
+                    listOf(16, 32, 64, 74, 80, 100, 112, 116, 120, 125, 126, 127, 129).map { it to qnText(it) }
+                showChoiceDialog(
+                    title = "默认画质（竖屏）",
+                    items = options.map { it.second },
+                    current = qnText(prefs.playerPreferredQnPortrait),
+                ) { selected ->
+                    val qn = options.firstOrNull { it.second == selected }?.first
+                    if (qn != null) prefs.playerPreferredQnPortrait = qn
+                    refreshSection(entry.title)
+                }
+            }
+
             "默认音轨" -> {
                 val options = listOf(30251, 30250, 30280, 30232, 30216)
                 val optionLabels = options.map { audioText(it) }
@@ -720,7 +735,7 @@ class SettingsActivity : BaseActivity() {
                 }
             }
 
-            "控制栏按钮" -> showPlayerActionButtonsDialog(sectionIndex = currentSectionIndex, focusTitle = entry.title)
+            "点赞投币收藏是否显示" -> showPlayerActionButtonsDialog(sectionIndex = currentSectionIndex, focusTitle = entry.title)
 
             "显示视频调试信息" -> {
                 prefs.playerDebugEnabled = !prefs.playerDebugEnabled
@@ -1177,7 +1192,7 @@ class SettingsActivity : BaseActivity() {
 
         val dialog =
             MaterialAlertDialogBuilder(this)
-                .setTitle("控制栏按钮")
+                .setTitle("点赞投币收藏是否显示")
                 .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
                     val key = keys[which]
                     if (isChecked) selected.add(key) else selected.remove(key)

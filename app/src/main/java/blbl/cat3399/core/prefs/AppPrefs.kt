@@ -113,6 +113,13 @@ class AppPrefs(context: Context) {
         get() = prefs.getInt(KEY_PLAYER_PREFERRED_QN, 80)
         set(value) = prefs.edit().putInt(KEY_PLAYER_PREFERRED_QN, value).apply()
 
+    var playerPreferredQnPortrait: Int
+        get() {
+            if (!prefs.contains(KEY_PLAYER_PREFERRED_QN_PORTRAIT)) return playerPreferredQn
+            return prefs.getInt(KEY_PLAYER_PREFERRED_QN_PORTRAIT, playerPreferredQn)
+        }
+        set(value) = prefs.edit().putInt(KEY_PLAYER_PREFERRED_QN_PORTRAIT, value).apply()
+
     var playerPreferredCodec: String
         get() = prefs.getString(KEY_PLAYER_CODEC, "AVC") ?: "AVC"
         set(value) = prefs.edit().putString(KEY_PLAYER_CODEC, value).apply()
@@ -329,6 +336,7 @@ class AppPrefs(context: Context) {
         private const val KEY_DANMAKU_SPEED = "danmaku_speed"
         private const val KEY_DANMAKU_AREA = "danmaku_area"
         private const val KEY_PLAYER_PREFERRED_QN = "player_preferred_qn"
+        private const val KEY_PLAYER_PREFERRED_QN_PORTRAIT = "player_preferred_qn_portrait"
         private const val KEY_PLAYER_CODEC = "player_codec"
         private const val KEY_PLAYER_AUDIO_ID = "player_audio_id"
         private const val KEY_PLAYER_CDN_PREFERENCE = "player_cdn_preference"
