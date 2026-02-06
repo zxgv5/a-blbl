@@ -17,6 +17,7 @@ import kotlin.math.roundToInt
 internal fun PlayerActivity.updateDebugOverlay() {
     val enabled = session.debugEnabled
     binding.tvDebug.visibility = if (enabled) View.VISIBLE else View.GONE
+    binding.danmakuView.setDebugEnabled(enabled)
     debugJob?.cancel()
     if (!enabled) return
     val exo = player ?: return
@@ -81,6 +82,44 @@ private fun PlayerActivity.buildDebugText(exo: ExoPlayer): String {
 
     sb.append("dropped=").append(debug.droppedFramesTotal)
     sb.append(" rebuffer=").append(debug.rebufferCount)
+
+    runCatching { binding.danmakuView.getDebugStats() }.getOrNull()?.let { dm ->
+        sb.append('\n')
+        sb.append("dm=").append(if (dm.configEnabled) "on" else "off")
+        sb.append(" fps=").append(String.format(Locale.US, "%.1f", dm.drawFps))
+        sb.append(" act=").append(dm.lastFrameActive)
+        sb.append(" pend=").append(dm.lastFramePending)
+        sb.append(" hit=").append(dm.lastFrameCachedDrawn).append('/').append(dm.lastFrameActive)
+        sb.append(" fb=").append(dm.lastFrameFallbackDrawn)
+        sb.append(" q=").append(dm.queueDepth)
+        sb.append('\n')
+
+        val poolMb = dm.poolBytes.toDouble() / (1024.0 * 1024.0)
+        val poolMaxMb = dm.poolMaxBytes.toDouble() / (1024.0 * 1024.0)
+        sb.append("bmp cache=").append(dm.cacheItems)
+        sb.append(" rendering=").append(dm.renderingItems)
+        sb.append(" pool=").append(dm.poolItems)
+        sb.append('(')
+            .append(String.format(Locale.US, "%.1f", poolMb))
+            .append('/')
+            .append(String.format(Locale.US, "%.0f", poolMaxMb))
+            .append("MB)")
+        sb.append(" new=").append(dm.bitmapCreated)
+        sb.append(" reuse=").append(dm.bitmapReused)
+        sb.append(" put=").append(dm.bitmapPutToPool)
+        sb.append(" rec=").append(dm.bitmapRecycled)
+        sb.append('\n')
+
+        sb.append("dm ms upd=")
+            .append(String.format(Locale.US, "%.2f", dm.updateAvgMs))
+            .append('/')
+            .append(String.format(Locale.US, "%.2f", dm.updateMaxMs))
+        sb.append(" draw=")
+            .append(String.format(Locale.US, "%.2f", dm.drawAvgMs))
+            .append('/')
+            .append(String.format(Locale.US, "%.2f", dm.drawMaxMs))
+        sb.append(" req=").append(dm.lastFrameRequestsActive).append('+').append(dm.lastFrameRequestsPrefetch)
+    }
     return sb.toString()
 }
 
